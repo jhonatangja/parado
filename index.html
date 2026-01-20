@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard J&T - Controle v7.0 (Filtro > 3 dias)</title>
+    <title>Dashboard J&T - Controle v7.0 (Filtro >= 2 dias)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
@@ -93,7 +93,7 @@
     <div class="container">
         <header class="header">
             <h1><i class="fas fa-exclamation-triangle"></i> Dashboard J&T - Controle v7.0</h1>
-            <p>Foco: Pendências Críticas (> 3 dias)</p>
+            <p>Foco: Pendências Críticas (>= 2 dias)</p>
         </header>
 
         <main class="main-content">
@@ -167,7 +167,7 @@
         <div class="modal-content">
             <div class="modal-header"><h3><i class="fab fa-whatsapp" style="color:#25D366;"></i> Gerador de Mensagem</h3></div>
             <div class="modal-body">
-                <p style="font-size:13px;color:#666;">* Filtro aplicado: Apenas pacotes com <b>MAIS de 3 dias</b> parados.</p>
+                <p style="font-size:13px;color:#666;">* Filtro aplicado: Apenas pacotes com <b>2 dias ou mais</b> parados.</p>
                 <label>Motorista:</label><select id="waDriverSelect"><option value="">-- Escolha --</option></select>
                 <label>Mensagem:</label><textarea id="waMessageText" readonly></textarea>
             </div>
@@ -179,7 +179,7 @@
         <div class="modal-content" style="width: 700px;">
             <div class="modal-header"><h3><i class="fas fa-city" style="color:#6f42c1;"></i> Cobrança por Cidade</h3></div>
             <div class="modal-body">
-                <p style="font-size:13px;color:#666;">* Filtro: Apenas motoristas com pacotes <b>> 3 dias</b> na cidade selecionada.</p>
+                <p style="font-size:13px;color:#666;">* Filtro: Apenas motoristas com pacotes <b>>= 2 dias</b> na cidade selecionada.</p>
                 <label>Selecione a Cidade:</label>
                 <select id="waCitySelect"><option value="">-- Escolha --</option></select>
                 
@@ -398,12 +398,13 @@
 
         function generateMsg(driver) {
             let allPkgs = driversDataMap[driver];
-            const criticalPkgs = allPkgs.filter(p => p.aging_days > 3);
+            // Alterado para >= 2 dias
+            const criticalPkgs = allPkgs.filter(p => p.aging_days >= 2);
             criticalPkgs.sort((a,b)=>b.aging_days-a.aging_days);
-            if (criticalPkgs.length === 0) return `Olá ${driver},\n\nSem pendências críticas (> 3 dias).`;
+            if (criticalPkgs.length === 0) return `Olá ${driver},\n\nSem pendências críticas (2 dias ou mais).`;
             const maxD = criticalPkgs[0].aging_days;
             const list = criticalPkgs.map(p => `📦 ${p.remessa} | ${cleanNome(p.destinatario)} (${p.aging_days}d) - ${cleanMotivo(p.reason)}`).join('\n');
-            return `Olá ${driver}, tudo bem?\n\nVocê possui ${criticalPkgs.length} pacotes críticos sem movimentação (antigo: ${maxD} dias).\nLista (acima de 3 dias):\n${list}\n\n⚠️ Pacotes +5 dias são extraviados auto.`;
+            return `Olá ${driver}, tudo bem?\n\nVocê possui ${criticalPkgs.length} pacotes críticos sem movimentação (antigo: ${maxD} dias).\nLista (2 dias ou mais):\n${list}\n\n⚠️ Pacotes +5 dias são extraviados auto.`;
         }
 
         function copyWa() {
@@ -417,8 +418,9 @@
         }
 
         function openWaByCity() {
-            const criticalTotal = currentFilteredPackages.filter(p => !p.is_delivered && p.aging_days > 3);
-            if(!criticalTotal.length) return alert("Nenhum pacote crítico pendente.");
+            // Alterado de > 3 para >= 2
+            const criticalTotal = currentFilteredPackages.filter(p => !p.is_delivered && p.aging_days >= 2);
+            if(!criticalTotal.length) return alert("Nenhum pacote (>= 2 dias) pendente.");
             const cities = [...new Set(criticalTotal.map(p => p.cidade).filter(c => c && c !== 'N/A'))].sort();
             els.waCitySel.innerHTML = '<option value="">-- Escolha a Cidade --</option>';
             cities.forEach(c => els.waCitySel.innerHTML += `<option value="${c}">${c}</option>`);
@@ -428,14 +430,16 @@
 
         function renderCityMessages(city) {
             if(!city) return;
-            const cityPkgs = currentFilteredPackages.filter(p => p.cidade === city && !p.is_delivered && p.aging_days > 3);
+            // Alterado de > 3 para >= 2
+            const cityPkgs = currentFilteredPackages.filter(p => p.cidade === city && !p.is_delivered && p.aging_days >= 2);
             const driverMap = {};
             cityPkgs.forEach(p => { if(!driverMap[p.responsavel]) driverMap[p.responsavel] = []; driverMap[p.responsavel].push(p); });
             const drivers = Object.keys(driverMap).sort();
             currentCityData = { city, drivers: driverMap };
             els.waCityStats.innerHTML = `Cidade: ${city} | ${drivers.length} Motoristas | Total: ${cityPkgs.length}`;
             els.waCityOut.innerHTML = '';
-            const cityHeader = `🚨 *MONITORAMENTO - ${city}* 🚨\nPacotes parados há mais de 3 dias - Priorizar entrega ou Fazer Devolução\n`;
+            // Atualizado texto do cabeçalho
+            const cityHeader = `🚨 *MONITORAMENTO - ${city}* 🚨\nPacotes parados há 2 dias ou mais - Priorizar entrega ou Fazer Devolução\n`;
             drivers.forEach(drv => {
                 const pkgs = driverMap[drv]; pkgs.sort((a,b) => b.aging_days - a.aging_days);
                 let blockStr = `🚚 *MOTORISTA: ${drv}* (${pkgs.length} pendências)\n` + pkgs.map(p => `📦 ${p.remessa} | ${cleanNome(p.destinatario)} (${p.aging_days} dias) - ${cleanMotivo(p.reason)}`).join('\n');
@@ -454,7 +458,8 @@
         function copyAllCityMessages() {
             const { city, drivers } = currentCityData;
             if(!city) return;
-            let fullText = `🚨 *MONITORAMENTO - ${city}* 🚨\nPacotes parados há mais de 3 dias - Priorizar entrega ou Fazer Devolução\n\n`;
+            // Atualizado texto do cabeçalho
+            let fullText = `🚨 *MONITORAMENTO - ${city}* 🚨\nPacotes parados há 2 dias ou mais - Priorizar entrega ou Fazer Devolução\n\n`;
             Object.keys(drivers).sort().forEach(drv => {
                 const pkgs = drivers[drv]; pkgs.sort((a,b) => b.aging_days - a.aging_days);
                 fullText += `➖➖➖➖➖➖➖➖➖➖\n🚚 *MOTORISTA: ${drv}* (${pkgs.length} pendências)\n` + pkgs.map(p => `📦 ${p.remessa} | ${cleanNome(p.destinatario)} (${p.aging_days} dias) - ${cleanMotivo(p.reason)}`).join('\n') + `\n\n`;
