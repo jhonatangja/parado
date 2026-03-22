@@ -3,491 +3,857 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard J&T - Controle v7.0 (Filtro >= 2 dias)</title>
+    <title>Sistema de Monitoramento - Logística F RVD</title>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
-    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; color: #333; margin: 0; padding: 20px; }
-        .container { max-width: 1400px; margin: 0 auto; }
-        .header { background: linear-gradient(90deg, #d9534f, #c9302c); color: white; padding: 25px 30px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(217, 83, 79, 0.3); }
-        .header h1 { margin: 0; font-size: 28px; }
-        .header p { margin: 5px 0 0; font-size: 16px; opacity: 0.9; }
-        
-        .main-content { display: flex; flex-direction: column; gap: 20px; }
-        .upload-section, .filter-section, .stats-cards, .table-card { background-color: #ffffff; border-radius: 12px; padding: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        .upload-section h2, .filter-section h2, .table-card h2 { margin-top: 0; margin-bottom: 20px; color: #c9302c; font-size: 20px; border-bottom: 2px solid #f0f2f5; padding-bottom: 10px; }
-        
-        .upload-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .upload-group { display: flex; flex-direction: column; }
-        .upload-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #555; }
-        input[type="file"] { font-size: 16px; border: 2px dashed #ccc; border-radius: 6px; padding: 10px; width: 100%; box-sizing: border-box; cursor: pointer; }
-        .load-button { background-color: #d9534f; color: white; padding: 12px 20px; border: none; border-radius: 6px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 15px; width: 100%; grid-column: 1 / -1; }
-        .load-button:hover { background-color: #c9302c; }
-        
-        .filter-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; align-items: end; }
-        .filter-group { display: flex; flex-direction: column; }
-        .quantity-filter-container { display: flex; gap: 10px; }
-        .quantity-filter-container select, .quantity-filter-container input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        .quantity-filter-container input { width: 100%; }
+        :root {
+            /* Paleta de Cores Corporativas */
+            --bg-body: #f1f5f9;
+            --bg-card: #ffffff;
+            --primary-dark: #0f172a; 
+            --primary-light: #1e293b;
+            --accent-blue: #0284c7;
+            
+            --text-main: #334155;
+            --text-muted: #64748b;
+            
+            --alert-yellow: #f59e0b;
+            --alert-yellow-bg: #fef3c7;
+            --alert-yellow-border: #fde68a;
+            
+            --critical-red: #ef4444;
+            --critical-red-bg: #fee2e2;
+            --critical-red-border: #fecaca;
+            
+            --success-green: #10b981;
+            --success-green-bg: #ecfdf5;
+            --success-green-border: #d1fae5;
+            
+            --border-radius: 6px;
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
 
-        .stats-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
-        .stat-card { background-color: #f9f9f9; border: 1px solid #e0e0e0; padding: 20px; border-radius: 8px; }
-        .stat-card h3 { margin: 0 0 10px; font-size: 14px; color: #555; text-transform: uppercase; }
-        .stat-card-value { font-size: 28px; font-weight: 700; }
-        .stat-card.total { border-left: 5px solid #d9534f; } .stat-card.total .stat-card-value { color: #d9534f; }
-        .stat-card.delivered { border-left: 5px solid #28a745; } .stat-card.delivered .stat-card-value { color: #28a745; }
-        .stat-card.operator { border-left: 5px solid #0275d8; } .stat-card.operator .stat-card-value { color: #0275d8; font-size: 22px; }
-        .stat-card.reason { border-left: 5px solid #5bc0de; } .stat-card.reason .stat-card-value { color: #5bc0de; font-size: 22px; }
-        
-        .rankings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
-        .table-container { max-height: 500px; overflow-y: auto; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #ddd; padding: 12px 15px; text-align: left; font-size: 14px; }
-        th { background-color: #f4f7f6; font-weight: 600; color: #333; position: sticky; top: 0; z-index: 10; }
-        tr.status-delivered { background-color: #d4edda !important; color: #155724; }
-        .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; display: inline-block; }
-        .badge-pending { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
-        .badge-delivered { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        th[data-sort] { cursor: pointer; user-select: none; position: relative; }
-        th[data-sort]:hover { background-color: #e9ecef; }
-        
-        .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #f0f2f5; padding-bottom: 10px; }
-        .table-header h2 { margin: 0; padding: 0; border: none; color: #c9302c; font-size: 20px; }
-        .table-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-        .action-button { background-color: #0275d8; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; }
-        .action-button:hover { background-color: #025aa5; }
-        .action-button.export { background-color: #5cb85c; } .action-button.export:hover { background-color: #449d44; }
-        .action-button.whatsapp { background-color: #25D366; } .action-button.whatsapp:hover { background-color: #1ebc59; }
-        .action-button.city-wa { background-color: #6f42c1; } .action-button.city-wa:hover { background-color: #59359a; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            padding-bottom: 40px;
+        }
 
-        #copyToast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 4px; padding: 16px; position: fixed; z-index: 1001; left: 50%; transform: translateX(-50%); bottom: 30px; font-size: 17px; opacity: 0; transition: opacity 0.3s, visibility 0.3s; }
-        #copyToast.show { visibility: visible; opacity: 1; }
-        .loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.8); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; }
-        .spinner { border: 8px solid #f3f3f3; border-top: 8px solid #d9534f; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .container {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
 
-        .modal-overlay { display: none; position: fixed; z-index: 1002; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
-        .modal-content { background-color: #fff; padding: 25px; border-radius: 12px; width: 600px; max-width: 90%; box-shadow: 0 5px 15px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 15px; }
-        .modal-header h3 { margin: 0; color: #333; font-size: 20px; border-bottom: 2px solid #f0f2f5; padding-bottom: 10px; }
-        .modal-body label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; }
-        .modal-body select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; margin-bottom: 15px; }
-        .modal-body textarea { width: 100%; height: 350px; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-family: monospace; font-size: 14px; resize: vertical; box-sizing: border-box; }
-        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; border-top: 2px solid #f0f2f5; padding-top: 15px; }
-        .btn-close { background-color: #999; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; }
-        .btn-copy { background-color: #25D366; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        /* --- HEADER CORPORATIVO --- */
+        .header {
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-light) 100%);
+            color: white;
+            padding: 25px 30px;
+            border-radius: 0 0 8px 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow-md);
+            margin-bottom: 25px;
+        }
+
+        .header-title h1 {
+            font-size: 1.6rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-title p {
+            color: #cbd5e1;
+            font-size: 0.9rem;
+            font-weight: 300;
+        }
+
+        /* --- UPLOAD BLOCK --- */
+        .upload-block {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px 20px;
+            border-radius: var(--border-radius);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .upload-btn-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .btn-upload {
+            border: none;
+            color: var(--primary-dark);
+            background-color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn-upload:hover { background-color: #f8fafc; }
+
+        .upload-btn-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* --- CARDS & PANELS --- */
+        .card {
+            background-color: var(--bg-card);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        /* --- DINAMIC TEXT --- */
+        .dynamic-banner {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--primary-dark);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* --- FILTROS --- */
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-group label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        .filter-group input, .filter-group select {
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.9rem;
+            color: var(--text-main);
+            outline: none;
+            transition: border-color 0.2s;
+            background-color: white;
+        }
+
+        .filter-group input:focus, .filter-group select:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .filter-highlight select {
+            border-color: var(--accent-blue);
+            font-weight: 600;
+            color: var(--primary-dark);
+        }
+
+        /* --- KPIs --- */
+        .kpi-wrapper {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .kpi-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-sm);
+            border-left: 4px solid var(--accent-blue);
+        }
+
+        .kpi-card.warning { border-left-color: var(--alert-yellow); }
+        .kpi-card.critical { border-left-color: var(--critical-red); }
+        .kpi-card.success { border-left-color: var(--success-green); }
         
-        .city-msg-list { max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; padding: 10px; background: #f9f9f9; }
-        .city-msg-item { background: #fff; border: 1px solid #eee; border-radius: 6px; padding: 10px; margin-bottom: 10px; }
-        .city-msg-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: bold; color: #555; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        .city-msg-content { width: 100%; height: 120px; font-family: monospace; font-size: 12px; border: 1px solid #ccc; resize: vertical; box-sizing: border-box; padding: 5px; margin-bottom: 5px; }
-        .btn-small-copy { background-color: #25D366; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
-        .btn-small-copy:hover { background-color: #1ebc59; }
+        .kpi-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .kpi-value {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--primary-dark);
+            margin-top: 8px;
+        }
+
+        .kpi-card.warning .kpi-value { color: var(--alert-yellow); }
+        .kpi-card.critical .kpi-value { color: var(--critical-red); }
+        .kpi-card.success .kpi-value { color: var(--success-green); }
+
+        /* --- RESUMOS OPERACIONAIS --- */
+        .summary-wrapper {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .summary-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .summary-list li {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.9rem;
+        }
+
+        .summary-list li:last-child { border-bottom: none; }
+        
+        .summary-list li span:last-child {
+            font-weight: 600;
+            background: var(--bg-body);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+        }
+
+        /* SCROLL CORPORATIVO PARA LISTAS LONGAS */
+        .scroll-area {
+            max-height: 185px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .scroll-area::-webkit-scrollbar { width: 6px; }
+        .scroll-area::-webkit-scrollbar-track { background: var(--bg-body); border-radius: 4px; }
+        .scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .scroll-area::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* --- TABELA PRINCIPAL --- */
+        .table-responsive {
+            overflow-x: auto;
+            max-height: 600px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            background-color: var(--primary-dark);
+            color: white;
+            font-weight: 500;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            padding: 15px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        th:hover { background-color: var(--primary-light); }
+
+        td {
+            padding: 14px 15px;
+            font-size: 0.9rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-main);
+        }
+
+        tbody tr:hover { background-color: #f8fafc; }
+        tbody tr:nth-child(even) { background-color: #fdfdfd; }
+
+        /* Cores de Linha Específicas */
+        tr.row-warning { background-color: var(--alert-yellow-bg) !important; }
+        tr.row-warning td { border-bottom-color: var(--alert-yellow-border); }
+        
+        tr.row-critical { background-color: var(--critical-red-bg) !important; }
+        tr.row-critical td { border-bottom-color: var(--critical-red-border); }
+
+        tr.row-success { background-color: var(--success-green-bg) !important; }
+        tr.row-success td { border-bottom-color: var(--success-green-border); }
+
+        /* Badges */
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-left: 8px;
+            display: inline-block;
+        }
+
+        .badge-warning { background-color: var(--alert-yellow); color: white; }
+        .badge-critical { background-color: var(--critical-red); color: white; }
+        .badge-success { background-color: var(--success-green); color: white; }
+        .badge-loss { background-color: var(--primary-dark); color: white; border: 1px solid #fff; }
+
+        .hidden { display: none !important; }
+        .btn-action {
+            background-color: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            float: right;
+            transition: 0.2s;
+        }
+        .btn-action:hover { background-color: #0369a1; }
+        
+        #error-message {
+            background-color: var(--critical-red-bg);
+            color: var(--critical-red);
+            border: 1px solid var(--critical-red-border);
+            padding: 15px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
     </style>
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <h1><i class="fas fa-exclamation-triangle"></i> Dashboard J&T - Controle v7.0</h1>
-            <p>Foco: Pendências Críticas (>= 2 dias)</p>
-        </header>
 
-        <main class="main-content">
-            <section class="upload-section">
-                <h2><i class="fas fa-file-excel"></i> Carregar Relatórios</h2>
-                <div class="upload-controls">
-                    <div class="upload-group">
-                        <label for="fileInput1">1. Relatório de Pacotes Parados</label>
-                        <input type="file" id="fileInput1" accept=".xlsx, .xls, .csv">
-                    </div>
-                    <div class="upload-group">
-                        <label for="fileInput2">2. Base de Dados (Carta de Porte)</label>
-                        <input type="file" id="fileInput2" accept=".xlsx, .xls, .csv">
-                    </div>
-                    <button id="loadButton" class="load-button"><i class="fas fa-upload"></i> Carregar e Cruzar Dados</button>
-                </div>
-            </section>
-            
-            <section class="filter-section">
-                <h2><i class="fas fa-filter"></i> Filtros (Dashboard)</h2>
-                <div class="filter-controls">
-                    <div class="filter-group"><label>Status</label><select id="statusFilter" multiple></select></div>
-                    <div class="filter-group"><label>Dias Parados</label><select id="agingFilter" multiple></select></div>
-                    <div class="filter-group"><label>Responsável</label><select id="responsavelFilter" multiple></select></div>
-                    <div class="filter-group"><label>Motivo</label><select id="reasonFilter" multiple></select></div>
-                    <div class="filter-group">
-                        <label>Volume (Qtd)</label>
-                        <div class="quantity-filter-container">
-                            <select id="qtyOperator"><option value="equal">=</option><option value="greater" selected>></option><option value="less"><</option></select>
-                            <input type="number" id="qtyValue" placeholder="Ex: 5" min="0">
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section class="stats-cards">
-                <div class="stat-card total"><h3><i class="fas fa-box"></i> Total Visualizado</h3><div class="stat-card-value" id="totalPackages">0</div></div>
-                <div class="stat-card delivered"><h3><i class="fas fa-check-circle"></i> Entregues</h3><div class="stat-card-value" id="deliveredPackages">0</div></div>
-                <div class="stat-card operator"><h3><i class="fas fa-user-secret"></i> Top Responsável</h3><div class="stat-card-value" id="topResponsavel">--</div></div>
-                <div class="stat-card reason"><h3><i class="fas fa-exclamation-circle"></i> Top Motivo</h3><div class="stat-card-value" id="topReason">--</div></div>
-            </section>
-
-            <section class="rankings-grid">
-                <div class="table-card"><h2><i class="fas fa-user-secret"></i> Responsáveis</h2><div class="table-container"><table id="responsavelRankTable"><thead><tr><th data-sort="key">Nome</th><th data-sort="count">Qtd</th></tr></thead><tbody id="responsavelRankTableBody"></tbody></table></div></div>
-                <div class="table-card"><h2><i class="fas fa-map-marker-alt"></i> Cidades</h2><div class="table-container"><table id="cityRankTable"><thead><tr><th data-sort="key">Cidade</th><th data-sort="count">Qtd</th></tr></thead><tbody id="cityRankTableBody"></tbody></table></div></div>
-                <div class="table-card"><h2><i class="fas fa-exclamation-circle"></i> Motivos</h2><div class="table-container"><table id="reasonRankTable"><thead><tr><th data-sort="key">Motivo</th><th data-sort="count">Qtd</th></tr></thead><tbody id="reasonRankTableBody"></tbody></table></div></div>
-            </section>
-            
-            <section class="table-card">
-                <div class="table-header">
-                    <h2><i class="fas fa-list-check"></i> Detalhes</h2>
-                    <div class="table-actions">
-                        <button id="waButton" class="action-button whatsapp"><i class="fab fa-whatsapp"></i> Gerar Msg Indiv.</button>
-                        <button id="waCityButton" class="action-button city-wa"><i class="fas fa-city"></i> Cobrança por Cidade</button>
-                        
-                        <button id="copyButton" class="action-button"><i class="fas fa-copy"></i> Copiar Tabela</button>
-                        <button id="exportButton" class="action-button export"><i class="fas fa-file-excel"></i> Exportar</button>
-                    </div>
-                </div>
-                <div class="table-container">
-                    <table id="detailsTable">
-                        <thead><tr><th data-sort="is_delivered">St</th><th data-sort="aging_days">Dias</th><th data-sort="remessa">Remessa</th><th data-sort="destinatario">Destinatário</th><th data-sort="responsavel">Resp.</th><th data-sort="cidade">Cidade</th><th data-sort="reason">Motivo</th></tr></thead>
-                        <tbody id="detailsTableBody"><tr><td colspan="7" style="text-align: center;">Carregue os arquivos...</td></tr></tbody>
-                    </table>
-                </div>
-            </section>
-        </main>
+<header class="header">
+    <div class="header-title">
+        <h1><i class="fa-solid fa-boxes-packing"></i> Monitoramento F RVD</h1>
+        <p>Análise operacional com cálculo de SLA e separação de pacotes entregues</p>
     </div>
+    <div class="upload-block">
+        <span id="fileNameDisplay" style="font-size: 0.85rem; color: #cbd5e1;">Nenhum arquivo...</span>
+        <div class="upload-btn-wrapper">
+            <button class="btn-upload"><i class="fa-solid fa-file-excel"></i> Carregar Dados</button>
+            <input type="file" id="fileUpload" accept=".xlsx, .xls, .csv">
+        </div>
+    </div>
+</header>
+
+<div class="container">
+    <div id="error-message" class="hidden"></div>
+
+    <div id="dashboard-content" class="hidden">
+        
+        <div class="dynamic-banner">
+            <i class="fa-solid fa-crosshairs" style="color: var(--accent-blue)"></i>
+            <span id="dynamic-title">0 pacotes exibidos</span>
+            
+            <button class="btn-action" onclick="copiarCodigosJMS()">
+                <i class="fa-solid fa-copy"></i> Copiar JMS
+            </button>
+        </div>
+
+        <div class="kpi-wrapper">
+            <div class="kpi-card">
+                <div class="kpi-title">Exibidos na Tabela</div>
+                <div class="kpi-value" id="kpi-total">0</div>
+            </div>
+            <div class="kpi-card warning">
+                <div class="kpi-title">Alerta (2 Dias)</div>
+                <div class="kpi-value" id="kpi-alert">0</div>
+            </div>
+            <div class="kpi-card critical">
+                <div class="kpi-title">Crítico (3+ Dias)</div>
+                <div class="kpi-value" id="kpi-critical">0</div>
+            </div>
+            <div class="kpi-card success">
+                <div class="kpi-title">Pacotes Entregues (Filtro)</div>
+                <div class="kpi-value" id="kpi-delivered">0</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><i class="fa-solid fa-filter"></i> Filtros de Pesquisa</div>
+            <div class="filters-grid">
+                <div class="filter-group filter-highlight">
+                    <label>Status</label>
+                    <select id="toggleEntregues">
+                        <option value="ocultar">Ocultar Entregues</option>
+                        <option value="mostrar">Mostrar Entregues</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Busca por JMS</label>
+                    <input type="text" id="filterJMS" placeholder="Buscar pedido...">
+                </div>
+                <div class="filter-group">
+                    <label>Responsável Atual</label>
+                    <select id="filterResponsavel"><option value="">Todos</option></select>
+                </div>
+                <div class="filter-group">
+                    <label>Tipo de Bipagem</label>
+                    <select id="filterTipo"><option value="">Todos</option></select>
+                </div>
+                <div class="filter-group">
+                    <label>Dias Parado (Mín)</label>
+                    <input type="number" id="filterDias" min="0" placeholder="Ex: 2">
+                </div>
+                <div class="filter-group">
+                    <label>Data Específica</label>
+                    <input type="date" id="filterDateStart">
+                </div>
+            </div>
+        </div>
+
+        <div class="summary-wrapper">
+            <div class="card" style="margin-bottom: 0;">
+                <div class="card-header"><i class="fa-solid fa-list-check"></i> Pacotes por Tipo</div>
+                <ul class="summary-list scroll-area" id="list-tipos">
+                </ul>
+            </div>
+            
+            <div class="card" style="margin-bottom: 0;">
+                <div class="card-header"><i class="fa-solid fa-clock"></i> Faixa de Dias Parados</div>
+                <ul class="summary-list" id="list-dias">
+                </ul>
+            </div>
+
+            <div class="card" style="margin-bottom: 0;">
+                <div class="card-header"><i class="fa-solid fa-truck-fast"></i> Pacotes por Responsável</div>
+                <ul class="summary-list scroll-area" id="list-responsaveis">
+                </ul>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><i class="fa-solid fa-table"></i> Detalhamento Operacional</div>
+            <div class="table-responsive">
+                <table id="dataTable">
+                    <thead>
+                        <tr>
+                            <th onclick="sortTable('jms')">Pedido JMS <i class="fa-solid fa-sort"></i></th>
+                            <th onclick="sortTable('responsavel')">Responsável <i class="fa-solid fa-sort"></i></th>
+                            <th onclick="sortTable('data')">Última Movimentação <i class="fa-solid fa-sort"></i></th>
+                            <th onclick="sortTable('dias')" style="text-align: center;">Status / Dias <i class="fa-solid fa-sort"></i></th>
+                            <th onclick="sortTable('tipo')">Tipo de Bipagem <i class="fa-solid fa-sort"></i></th>
+                            <th onclick="sortTable('base')">Base Atual <i class="fa-solid fa-sort"></i></th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    let dadosProcessados = [];
+    let dadosFiltrados = [];
+    let totalEntreguesNoFiltro = 0;
+    let sortDirection = 1;
+
+    const DATA_ATUAL = new Date(); 
+    const HOJE = new Date(DATA_ATUAL.getFullYear(), DATA_ATUAL.getMonth(), DATA_ATUAL.getDate());
+
+    document.getElementById('fileUpload').addEventListener('change', handleFileUpload);
     
-    <div id="waModal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header"><h3><i class="fab fa-whatsapp" style="color:#25D366;"></i> Gerador de Mensagem</h3></div>
-            <div class="modal-body">
-                <p style="font-size:13px;color:#666;">* Filtro aplicado: Apenas pacotes com <b>2 dias ou mais</b> parados.</p>
-                <label>Motorista:</label><select id="waDriverSelect"><option value="">-- Escolha --</option></select>
-                <label>Mensagem:</label><textarea id="waMessageText" readonly></textarea>
-            </div>
-            <div class="modal-footer"><button id="waCloseBtn" class="btn-close">Fechar</button><button id="waCopyBtn" class="btn-copy">Copiar</button></div>
-        </div>
-    </div>
+    // Incluímos o toggleEntregues no array de eventos
+    const filterInputs = ['filterJMS', 'filterDateStart', 'filterTipo', 'filterDias', 'filterResponsavel', 'toggleEntregues'];
+    filterInputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', applyFilters);
+    });
 
-    <div id="waCityModal" class="modal-overlay">
-        <div class="modal-content" style="width: 700px;">
-            <div class="modal-header"><h3><i class="fas fa-city" style="color:#6f42c1;"></i> Cobrança por Cidade</h3></div>
-            <div class="modal-body">
-                <p style="font-size:13px;color:#666;">* Filtro: Apenas motoristas com pacotes <b>>= 2 dias</b> na cidade selecionada.</p>
-                <label>Selecione a Cidade:</label>
-                <select id="waCitySelect"><option value="">-- Escolha --</option></select>
-                
-                <div id="waCityStats" style="margin-bottom:10px; font-weight:bold; color:#d9534f; font-size:14px;"></div>
+    function handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
 
-                <label>Mensagens Geradas (Por Motorista):</label>
-                <div id="waCityOutput" class="city-msg-list">
-                    <div style="text-align:center; padding:20px; color:#999;">Selecione uma cidade acima para gerar as mensagens.</div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="waCityCloseBtn" class="btn-close">Fechar</button>
-                <button id="waCityCopyAllBtn" class="btn-copy" style="background-color:#6f42c1;">Copiar Todas</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="loading" id="loading" style="display: none;"><div class="spinner"></div><p>Processando...</p></div>
-    <div id="copyToast"></div>
-
-    <script>
-        // CONFIG COLUNAS
-        const COL_STOP_REMESSA = 'Remessa';
-        const COL_STOP_AGING = 'Aging';
-        const COL_STOP_MOTIVO_FALHA = 'Nome de pacote problemático';
-        const COL_PORTE_REMESSA = 'Número de pedido JMS';
-        const COL_PORTE_RESPONSAVEL = 'Responsável pela entrega';
-        const COL_PORTE_CIDADE = 'Cidade Destino';
-        const COL_PORTE_STATUS = 'Marca de assinatura';
-        const COL_PORTE_DESTINATARIO = 'Destinatário';
-        const VALOR_ENTREGUE = 'RECEBIMENTO COM ASSINATURA NORMAL';
-
-        let allPackages = [], currentFilteredPackages = [];
-        let filterStatus, filterAging, filterResponsavel, filterReason;
-        let driversDataMap = {}; 
-        let sortStates = { responsavelRankTable: {c:'count',o:'desc'}, reasonRankTable: {c:'count',o:'desc'}, cityRankTable: {c:'count',o:'desc'}, detailsTable: {c:'aging_days',o:'desc'} };
+        document.getElementById('fileNameDisplay').textContent = file.name;
+        document.getElementById('error-message').classList.add('hidden');
         
-        let currentCityData = { city: "", drivers: {} };
+        const reader = new FileReader();
 
-        // DOM
-        const els = {
-            f1: document.getElementById('fileInput1'), f2: document.getElementById('fileInput2'),
-            load: document.getElementById('loadButton'), spinner: document.getElementById('loading'),
-            total: document.getElementById('totalPackages'), deliv: document.getElementById('deliveredPackages'),
-            topR: document.getElementById('topResponsavel'), topM: document.getElementById('topReason'),
-            op: document.getElementById('qtyOperator'), val: document.getElementById('qtyValue'),
-            // WA INDIVIDUAL
-            waBtn: document.getElementById('waButton'), waModal: document.getElementById('waModal'),
-            waSel: document.getElementById('waDriverSelect'), waTxt: document.getElementById('waMessageText'),
-            waClose: document.getElementById('waCloseBtn'), waCopy: document.getElementById('waCopyBtn'),
-            // WA CIDADE
-            waCityBtn: document.getElementById('waCityButton'), waCityModal: document.getElementById('waCityModal'),
-            waCitySel: document.getElementById('waCitySelect'), waCityOut: document.getElementById('waCityOutput'),
-            waCityStats: document.getElementById('waCityStats'),
-            waCityClose: document.getElementById('waCityCloseBtn'), waCityCopyAll: document.getElementById('waCityCopyAllBtn')
-        };
-
-        // INIT
-        els.load.addEventListener('click', handleFileLoad);
-        setupSorters(); setupActions();
-        els.op.addEventListener('change', update); els.val.addEventListener('input', update);
-        
-        els.waBtn.addEventListener('click', openWa); 
-        els.waClose.addEventListener('click', ()=>els.waModal.style.display='none');
-        els.waCopy.addEventListener('click', copyWa);
-        els.waSel.addEventListener('change', (e)=> els.waTxt.value = e.target.value ? generateMsg(e.target.value) : "");
-        
-        els.waCityBtn.addEventListener('click', openWaByCity);
-        els.waCityClose.addEventListener('click', ()=>els.waCityModal.style.display='none');
-        els.waCitySel.addEventListener('change', (e) => renderCityMessages(e.target.value));
-        els.waCityCopyAll.addEventListener('click', copyAllCityMessages);
-
-        window.onclick = (e) => { 
-            if(e.target==els.waModal) els.waModal.style.display='none'; 
-            if(e.target==els.waCityModal) els.waCityModal.style.display='none';
-        }
-
-        function readFile(f) { return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>{try{res(XLSX.utils.sheet_to_json(XLSX.read(e.target.result,{type:'array'}).Sheets[XLSX.read(e.target.result,{type:'array'}).SheetNames[0]],{raw:false}));}catch(ER){rej(ER);}};r.readAsArrayBuffer(f);});}
-        
-        async function handleFileLoad() {
-            if(!els.f1.files[0]||!els.f2.files[0]) return alert("Selecione os dois arquivos!");
-            els.spinner.style.display='flex';
+        reader.onload = function(e) {
             try {
-                const [j1, j2] = await Promise.all([readFile(els.f1.files[0]), readFile(els.f2.files[0])]);
-                const map = new Map();
-                j2.forEach(r=>{
-                    const k=String(r[COL_PORTE_REMESSA]||'').trim();
-                    if(k) map.set(k,{
-                        r:String(r[COL_PORTE_RESPONSAVEL]||'N/A').trim(),
-                        c:String(r[COL_PORTE_CIDADE]||'N/A').trim(),
-                        s:String(r[COL_PORTE_STATUS]||'').trim().toUpperCase(),
-                        d:String(r[COL_PORTE_DESTINATARIO]||'N/A').trim()
-                    });
-                });
-                allPackages = j1.map(r=>{
-                    const k=String(r[COL_STOP_REMESSA]||'').trim();
-                    const d=map.get(k)||{r:'N/A',c:'N/A',s:'',d:'N/A'};
-                    const agT=String(r[COL_STOP_AGING]||'').trim();
-                    const agN=parseInt((agT.match(/(\d+)/)||['0','0'])[1]);
-                    return {
-                        remessa:k, aging:agT, aging_days:agN,
-                        reason:String(r[COL_STOP_MOTIVO_FALHA]||'PARADO SEM MOTIVO').trim(),
-                        responsavel:d.r, cidade:d.c,
-                        is_delivered:d.s.includes(VALOR_ENTREGUE), destinatario:d.d
-                    };
-                });
-                initFilters(); update();
-            } catch(e){console.error(e);alert("Erro ao ler arquivos.");}
-            finally{els.spinner.style.display='none';}
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                if (jsonData.length === 0) throw new Error("A planilha está vazia.");
+
+                validarColunas(jsonData[0]);
+                processarRegrasDeNegocio(jsonData);
+
+                document.getElementById('dashboard-content').classList.remove('hidden');
+
+            } catch (error) {
+                const errDiv = document.getElementById('error-message');
+                errDiv.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${error.message}`;
+                errDiv.classList.remove('hidden');
+                document.getElementById('dashboard-content').classList.add('hidden');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function validarColunas(primeiraLinha) {
+        const colunasObrigatorias = ["Número de pedido JMS", "Tempo de digitalização", "Tipo de bipagem", "Base de escaneamento"];
+        const colunasEncontradas = Object.keys(primeiraLinha);
+        const colunasFaltantes = colunasObrigatorias.filter(col => !colunasEncontradas.includes(col));
+        if (colunasFaltantes.length > 0) {
+            throw new Error(`Erro de Estrutura: Faltam as colunas obrigatórias: <b>${colunasFaltantes.join(', ')}</b>`);
         }
+    }
 
-        function initFilters() {
-            const ags = [...new Set(allPackages.map(p=>p.aging_days).filter(d=>d>0))].sort((a,b)=>a-b).map(d=>({value:d,label:`${d}d`}));
-            const resps = [...new Set(allPackages.map(p=>p.responsavel).filter(Boolean))].sort();
-            const reas = [...new Set(allPackages.map(p=>p.reason).filter(Boolean))].sort();
+    function processarRegrasDeNegocio(dadosBrutos) {
+        const mapaPacotes = new Map();
+        const tiposBipagemSet = new Set();
+        const responsaveisSet = new Set();
 
-            if(filterStatus) [filterStatus,filterAging,filterResponsavel,filterReason].forEach(f=>f.destroy());
-            filterStatus = new Choices('#statusFilter',{choices:[{value:'p',label:'Pendente'},{value:'d',label:'Entregue'}],removeItemButton:true});
-            filterAging = new Choices('#agingFilter',{choices:ags,removeItemButton:true});
-            filterResponsavel = new Choices('#responsavelFilter',{choices:resps.map(v=>({value:v,label:v})),removeItemButton:true});
-            filterReason = new Choices('#reasonFilter',{choices:reas.map(v=>({value:v,label:v})),removeItemButton:true});
-            ['statusFilter','agingFilter','responsavelFilter','reasonFilter'].forEach(id=>document.getElementById(id).addEventListener('change',update));
-        }
-
-        function update() {
-            if(!allPackages.length) return;
-            const s=filterStatus.getValue(true), a=filterAging.getValue(true), r=filterResponsavel.getValue(true), m=filterReason.getValue(true);
-            const op=els.op.value, val=els.val.value===''?null:parseInt(els.val.value);
+        dadosBrutos.forEach((linha) => {
+            let base = linha["Base de escaneamento"];
+            const jms = linha["Número de pedido JMS"];
             
-            let res = allPackages.filter(p=>{
-                if(s.length && ((s.includes('d')&&!p.is_delivered)||(s.includes('p')&&p.is_delivered))) return false;
-                if(a.length && !a.some(x=>parseInt(x)===p.aging_days)) return false;
-                if(r.length && !r.includes(p.responsavel)) return false;
-                if(m.length && !m.includes(p.reason)) return false;
-                return true;
+            if (!base || !jms || !base.toString().includes("F RVD")) return;
+
+            let dataBipagem = linha["Tempo de digitalização"];
+            let dataValida = (dataBipagem instanceof Date) ? dataBipagem : new Date(dataBipagem);
+            if (isNaN(dataValida.getTime())) return;
+
+            if (!mapaPacotes.has(jms)) mapaPacotes.set(jms, []);
+            
+            mapaPacotes.get(jms).push({
+                data: dataValida,
+                tipo: linha["Tipo de bipagem"] || "Sem bipagem",
+                base: base,
+                motorista: linha["Correio de coleta ou entrega"] || "",
+                tipoProblematico: linha["Tipo problemático"] || ""
+            });
+        });
+
+        dadosProcessados = [];
+
+        mapaPacotes.forEach((historico, jms) => {
+            historico.sort((a, b) => a.data.getTime() - b.data.getTime());
+
+            const ultimoRegistro = historico[historico.length - 1];
+            const tipoFinalLower = ultimoRegistro.tipo.toLowerCase();
+
+            // 🚨 Identificador de pacote entregue
+            const isEntregue = tipoFinalLower.includes("assinatura de encomenda") || tipoFinalLower.includes("entregue");
+
+            let responsavelAtual = "Base";
+            let motoristaSalvoNaMemoria = "";
+            let flagPerdido = false;
+
+            historico.forEach(registro => {
+                const tipoLower = registro.tipo.toLowerCase();
+
+                if (tipoLower.includes("saída para entrega") || tipoLower.includes("saida para entrega")) {
+                    motoristaSalvoNaMemoria = registro.motorista || motoristaSalvoNaMemoria;
+                    responsavelAtual = motoristaSalvoNaMemoria || "Motorista (Sem Nome)";
+                    flagPerdido = false;
+                } else if (tipoLower.includes("problemático") || tipoLower.includes("problematico") || registro.tipoProblematico) {
+                    responsavelAtual = motoristaSalvoNaMemoria || "Motorista (Sem Nome)";
+                    flagPerdido = false;
+                } else if (tipoLower.includes("entrada no galpão") || tipoLower.includes("entrada no galpao")) {
+                    responsavelAtual = registro.base;
+                    motoristaSalvoNaMemoria = "";
+                    flagPerdido = false;
+                } else {
+                    responsavelAtual = registro.base;
+                    if (tipoLower.includes("recebimento") || tipoLower.includes("descarga") || tipoLower.includes("chegada")) {
+                        flagPerdido = true;
+                    } else {
+                        flagPerdido = false;
+                    }
+                }
             });
 
-            if(val!==null) {
-                const c={}; res.forEach(p=>c[p.responsavel]=(c[p.responsavel]||0)+1);
-                res = res.filter(p=>{const n=c[p.responsavel]||0; return op==='equal'?n===val:op==='greater'?n>val:n<val;});
-            }
-            currentFilteredPackages = res;
-            
-            const rc={}, mc={}, cc={};
-            res.forEach(p=>{ if(p.responsavel)rc[p.responsavel]=(rc[p.responsavel]||0)+1; if(p.reason)mc[p.reason]=(mc[p.reason]||0)+1; if(p.cidade)cc[p.cidade]=(cc[p.cidade]||0)+1; });
-            
-            els.total.textContent = res.length;
-            els.deliv.textContent = res.filter(p=>p.is_delivered).length;
-            els.topR.textContent = getTop(rc); els.topM.textContent = getTop(mc);
-            
-            renderTable('responsavelRankTable',rc); renderTable('reasonRankTable',mc); renderTable('cityRankTable',cc); renderDetails(res);
-        }
+            // Se for entregue, não aplicamos a flag de possível perda
+            if (isEntregue) flagPerdido = false;
 
-        function getTop(o){const k=Object.keys(o).sort((a,b)=>o[b]-o[a])[0]; return k?(k.length>15?k.substr(0,15)+'...':k):'--';}
+            const dataMov = new Date(ultimoRegistro.data.getFullYear(), ultimoRegistro.data.getMonth(), ultimoRegistro.data.getDate());
+            const diffTempo = HOJE.getTime() - dataMov.getTime();
+            const diasParado = Math.floor(diffTempo / (1000 * 3600 * 24)); 
+
+            tiposBipagemSet.add(ultimoRegistro.tipo);
+            responsaveisSet.add(responsavelAtual);
+
+            dadosProcessados.push({
+                jms: jms.toString().trim(),
+                ultimaData: ultimoRegistro.data,
+                tipoBipagem: ultimoRegistro.tipo,
+                baseEscaneamento: ultimoRegistro.base,
+                responsavel: responsavelAtual,
+                diasParado: diasParado >= 0 ? diasParado : 0,
+                isPerdido: flagPerdido,
+                isEntregue: isEntregue // Guardamos se foi entregue para o filtro
+            });
+        });
+
+        preencherSelect('filterTipo', tiposBipagemSet);
+        preencherSelect('filterResponsavel', responsaveisSet);
+
+        applyFilters(); 
+    }
+
+    function preencherSelect(id, setValores) {
+        const select = document.getElementById(id);
+        select.innerHTML = '<option value="">Todos</option>';
+        Array.from(setValores).sort().forEach(valor => {
+            select.add(new Option(valor, valor));
+        });
+    }
+
+    function applyFilters() {
+        const strJMS = document.getElementById('filterJMS').value.toLowerCase();
+        const strResponsavel = document.getElementById('filterResponsavel').value;
+        const strDataInicio = document.getElementById('filterDateStart').value;
+        const strTipo = document.getElementById('filterTipo').value;
+        const minDias = parseInt(document.getElementById('filterDias').value) || 0;
+        const showEntregues = document.getElementById('toggleEntregues').value === 'mostrar';
+
+        totalEntreguesNoFiltro = 0; // Reset do KPI
         
-        function renderTable(id, data) {
-            const b = document.getElementById(id+'Body'); b.innerHTML='';
-            const arr = Object.keys(data).map(k=>({key:k,count:data[k]}));
-            const {c,o} = sortStates[id];
-            arr.sort((x,y)=>(o==='asc'?1:-1)*(typeof x[c]==='string'?x[c].localeCompare(y[c]):x[c]-y[c]));
-            if(!arr.length) b.innerHTML='<tr><td colspan="2">Vazio</td></tr>';
-            else arr.forEach(i=>b.innerHTML+=`<tr><td>${i.key}</td><td>${i.count}</td></tr>`);
-            updateSortUI(id);
-        }
+        dadosFiltrados = dadosProcessados.filter(item => {
+            // Filtros Gerais
+            if (strJMS && !item.jms.toLowerCase().includes(strJMS)) return false;
+            if (strResponsavel && item.responsavel !== strResponsavel) return false;
+            if (strTipo && item.tipoBipagem !== strTipo) return false;
 
-        function renderDetails(list) {
-            const b = document.getElementById('detailsTableBody'); b.innerHTML='';
-            const {c,o} = sortStates.detailsTable;
-            list.sort((x,y)=>{
-                let vx=x[c], vy=y[c];
-                if(c==='aging_days'){vx=vx||0;vy=vy||0;} else {vx=String(vx).toLowerCase();vy=String(vy).toLowerCase();}
-                return (o==='asc'?1:-1)*(vx<vy?-1:vx>vy?1:0);
-            });
-            updateSortUI('detailsTable');
-            if(!list.length) return b.innerHTML='<tr><td colspan="7" align="center">Vazio</td></tr>';
-            list.slice(0,500).forEach(p=>{
-                b.innerHTML+=`<tr class="${p.is_delivered?'status-delivered':''}">
-                    <td><span class="badge ${p.is_delivered?'badge-delivered':'badge-pending'}">${p.is_delivered?'OK':'PEND'}</span></td>
-                    <td>${p.aging_days}d</td><td><b>${p.remessa}</b></td><td>${p.destinatario}</td><td>${p.responsavel}</td><td>${p.cidade}</td><td>${p.reason}</td>
-                </tr>`;
-            });
-        }
+            const offset = item.ultimaData.getTimezoneOffset() * 60000;
+            const localISOTime = (new Date(item.ultimaData.getTime() - offset)).toISOString().split('T')[0];
+            
+            if (strDataInicio && localISOTime !== strDataInicio) return false;
 
-        function cleanMotivo(m) {
-            if(!m) return "S/ Motivo";
-            const upper = m.toUpperCase();
-            if(upper.includes("AUSÊNCIA") || upper.includes("AUSENCIA")) return "Ausente";
-            if(upper.includes("PARADO SEM MOTIVO")) return "Parado";
-            if(upper.includes("ENDEREÇO") || upper.includes("ENDERECO")) return "End. Incorreto";
-            if(upper.includes("ENCOMENDA.EXPEDIDA")) return "Parado"; 
-            if(upper.includes("CLIENTE DESCONHECIDO")) return "Desc. no Local";
-            if(upper.includes("RECUSADO")) return "Recusado";
-            return m.length > 15 ? m.substring(0, 15) + "." : m;
-        }
-
-        function cleanNome(n) {
-            if(!n || n === 'N/A') return "S/ Nome";
-            const parts = n.split(' ');
-            if(parts.length > 2) {
-                let short = parts[0] + " " + parts[1];
-                if(short.length > 20) return n.substring(0, 20) + ".";
-                return short;
+            // Se for entregue, apenas computamos pro KPI (ignora validação de dias parado)
+            if (item.isEntregue) {
+                totalEntreguesNoFiltro++;
+                if (!showEntregues) return false; // Remove da tabela se opção "Ocultar" estiver ativa
+            } else {
+                // Se NÃO for entregue, aplica o filtro de "Dias Parado Mínimo"
+                if (item.diasParado < minDias) return false;
             }
-            return n.length > 20 ? n.substring(0, 20) + "." : n;
-        }
 
-        function openWa() {
-            if(!currentFilteredPackages.length) return alert("Sem dados.");
-            driversDataMap={};
-            currentFilteredPackages.forEach(p=>{ if(!p.is_delivered) (driversDataMap[p.responsavel]||(driversDataMap[p.responsavel]=[])).push(p); });
-            els.waSel.innerHTML='<option value="">-- Escolha --</option>';
-            Object.keys(driversDataMap).sort().forEach(k=>els.waSel.innerHTML+=`<option value="${k}">${k} (${driversDataMap[k].length} total)</option>`);
-            if(!els.waSel.children.length) alert("Tudo entregue!");
-            else els.waModal.style.display='flex';
-        }
+            return true;
+        });
 
-        function generateMsg(driver) {
-            let allPkgs = driversDataMap[driver];
-            // Alterado para >= 2 dias
-            const criticalPkgs = allPkgs.filter(p => p.aging_days >= 2);
-            criticalPkgs.sort((a,b)=>b.aging_days-a.aging_days);
-            if (criticalPkgs.length === 0) return `Olá ${driver},\n\nSem pendências críticas (2 dias ou mais).`;
-            const maxD = criticalPkgs[0].aging_days;
-            const list = criticalPkgs.map(p => `📦 ${p.remessa} | ${cleanNome(p.destinatario)} (${p.aging_days}d) - ${cleanMotivo(p.reason)}`).join('\n');
-            return `Olá ${driver}, tudo bem?\n\nVocê possui ${criticalPkgs.length} pacotes críticos sem movimentação (antigo: ${maxD} dias).\nLista (2 dias ou mais):\n${list}\n\n⚠️ Pacotes +5 dias são extraviados auto.`;
-        }
+        // Ordena colocando os mais críticos primeiro, mas joga os entregues para o final
+        dadosFiltrados.sort((a, b) => {
+            if (a.isEntregue && !b.isEntregue) return 1;
+            if (!a.isEntregue && b.isEntregue) return -1;
+            return b.diasParado - a.diasParado;
+        });
 
-        function copyWa() {
-            if(!els.waTxt.value) return;
-            navigator.clipboard.writeText(els.waTxt.value).then(showToast);
-        }
+        atualizarInterface();
+    }
 
-        function showToast() {
-            const t=document.getElementById('copyToast'); t.innerText="Copiado!"; t.classList.add('show');
-            setTimeout(()=>t.classList.remove('show'),2000);
-        }
+    function atualizarInterface() {
+        document.getElementById('dynamic-title').innerHTML = `<b>${dadosFiltrados.length}</b> pacotes visíveis na tabela`;
 
-        function openWaByCity() {
-            // Alterado de > 3 para >= 2
-            const criticalTotal = currentFilteredPackages.filter(p => !p.is_delivered && p.aging_days >= 2);
-            if(!criticalTotal.length) return alert("Nenhum pacote (>= 2 dias) pendente.");
-            const cities = [...new Set(criticalTotal.map(p => p.cidade).filter(c => c && c !== 'N/A'))].sort();
-            els.waCitySel.innerHTML = '<option value="">-- Escolha a Cidade --</option>';
-            cities.forEach(c => els.waCitySel.innerHTML += `<option value="${c}">${c}</option>`);
-            els.waCityOut.innerHTML = ''; els.waCityStats.innerHTML = '';
-            els.waCityModal.style.display = 'flex';
-        }
+        let countAlert = 0;
+        let countCritical = 0;
+        const tiposMap = new Map();
+        const responsaveisMap = new Map();
+        
+        let range01 = 0;
+        let range2 = 0;
+        let range3 = 0;
 
-        function renderCityMessages(city) {
-            if(!city) return;
-            // Alterado de > 3 para >= 2
-            const cityPkgs = currentFilteredPackages.filter(p => p.cidade === city && !p.is_delivered && p.aging_days >= 2);
-            const driverMap = {};
-            cityPkgs.forEach(p => { if(!driverMap[p.responsavel]) driverMap[p.responsavel] = []; driverMap[p.responsavel].push(p); });
-            const drivers = Object.keys(driverMap).sort();
-            currentCityData = { city, drivers: driverMap };
-            els.waCityStats.innerHTML = `Cidade: ${city} | ${drivers.length} Motoristas | Total: ${cityPkgs.length}`;
-            els.waCityOut.innerHTML = '';
-            // Atualizado texto do cabeçalho
-            const cityHeader = `🚨 *MONITORAMENTO - ${city}* 🚨\nPacotes parados há 2 dias ou mais - Priorizar entrega ou Fazer Devolução\n`;
-            drivers.forEach(drv => {
-                const pkgs = driverMap[drv]; pkgs.sort((a,b) => b.aging_days - a.aging_days);
-                let blockStr = `🚚 *MOTORISTA: ${drv}* (${pkgs.length} pendências)\n` + pkgs.map(p => `📦 ${p.remessa} | ${cleanNome(p.destinatario)} (${p.aging_days} dias) - ${cleanMotivo(p.reason)}`).join('\n');
-                const div = document.createElement('div');
-                div.className = 'city-msg-item';
-                div.innerHTML = `<div class="city-msg-header"><span>${drv}</span><button class="btn-small-copy" onclick="copyText(this)">Copiar</button></div><textarea class="city-msg-content" readonly>${cityHeader + '➖➖➖➖➖➖➖➖➖➖\n' + blockStr}</textarea>`;
-                els.waCityOut.appendChild(div);
+        dadosFiltrados.forEach(item => {
+            if (!item.isEntregue) {
+                if (item.diasParado === 2) countAlert++;
+                if (item.diasParado >= 3) countCritical++;
+
+                if (item.diasParado <= 1) range01++;
+                else if (item.diasParado === 2) range2++;
+                else range3++;
+            }
+
+            tiposMap.set(item.tipoBipagem, (tiposMap.get(item.tipoBipagem) || 0) + 1);
+            responsaveisMap.set(item.responsavel, (responsaveisMap.get(item.responsavel) || 0) + 1);
+        });
+
+        document.getElementById('kpi-total').textContent = dadosFiltrados.length;
+        document.getElementById('kpi-alert').textContent = countAlert;
+        document.getElementById('kpi-critical').textContent = countCritical;
+        document.getElementById('kpi-delivered').textContent = totalEntreguesNoFiltro;
+
+        // 1. Tipos de Bipagem (SEM LIMITE e com Scroll)
+        const ulTipos = document.getElementById('list-tipos');
+        ulTipos.innerHTML = '';
+        const tiposArray = Array.from(tiposMap, ([nome, qtd]) => ({ nome, qtd })).sort((a,b) => b.qtd - a.qtd);
+        tiposArray.forEach(t => {
+            ulTipos.innerHTML += `<li><span>${t.nome}</span> <span>${t.qtd}</span></li>`;
+        });
+        if(tiposArray.length === 0) ulTipos.innerHTML = '<li><span style="color: #94a3b8;">Nenhum dado</span></li>';
+
+        // 2. Faixa de Dias (Apenas para não entregues)
+        const ulDias = document.getElementById('list-dias');
+        ulDias.innerHTML = `
+            <li><span>0 a 1 dia (Normal)</span> <span>${range01}</span></li>
+            <li><span style="color:var(--alert-yellow); font-weight:600;">2 dias (Atenção)</span> <span>${range2}</span></li>
+            <li><span style="color:var(--critical-red); font-weight:600;">3+ dias (Crítico)</span> <span>${range3}</span></li>
+        `;
+
+        // 3. Mostrar TODOS os responsáveis com scroll
+        const ulResponsaveis = document.getElementById('list-responsaveis');
+        ulResponsaveis.innerHTML = '';
+        const respArray = Array.from(responsaveisMap, ([nome, qtd]) => ({ nome, qtd })).sort((a,b) => b.qtd - a.qtd);
+        respArray.forEach(r => {
+            ulResponsaveis.innerHTML += `<li><span>${r.nome}</span> <span>${r.qtd}</span></li>`;
+        });
+        if(respArray.length === 0) ulResponsaveis.innerHTML = '<li><span style="color: #94a3b8;">Nenhum dado</span></li>';
+
+        renderizarTabela();
+    }
+
+    function renderizarTabela() {
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+
+        dadosFiltrados.forEach(item => {
+            const tr = document.createElement('tr');
+            let badges = "";
+            let infoDias = `<b style="font-size: 1.1em;">${item.diasParado}</b>`;
+
+            if (item.isEntregue) {
+                tr.classList.add('row-success');
+                badges += `<span class="badge badge-success"><i class="fa-solid fa-check"></i> ENTREGUE</span>`;
+                infoDias = `<span style="color: var(--success-green); font-weight: 700;">Finalizado</span>`;
+            } else {
+                if (item.diasParado >= 3) {
+                    tr.classList.add('row-critical');
+                    badges += `<span class="badge badge-critical">CRÍTICO</span>`;
+                } else if (item.diasParado === 2) {
+                    tr.classList.add('row-warning');
+                    badges += `<span class="badge badge-warning">ALERTA</span>`;
+                }
+                
+                if (item.isPerdido) {
+                    badges += `<span class="badge badge-loss"><i class="fa-solid fa-triangle-exclamation"></i> PERDIDO?</span>`;
+                }
+            }
+
+            const dataFormatada = item.ultimaData.toLocaleString('pt-BR', {
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute:'2-digit'
             });
+
+            tr.innerHTML = `
+                <td><b>${item.jms}</b> <br> ${badges}</td>
+                <td>${item.responsavel}</td>
+                <td>${dataFormatada}</td>
+                <td style="text-align: center;">${infoDias}</td>
+                <td>${item.tipoBipagem}</td>
+                <td>${item.baseEscaneamento}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        if (dadosFiltrados.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 30px; color: var(--text-muted);">Nenhum pacote atende aos filtros atuais.</td></tr>';
+        }
+    }
+
+    function copiarCodigosJMS() {
+        if (dadosFiltrados.length === 0) {
+            alert("Não há códigos na tabela para copiar.");
+            return;
+        }
+        // Ao copiar os códigos, geralmente não queremos copiar os que já estão entregues
+        const filtradosParaCopiar = dadosFiltrados.filter(i => !i.isEntregue);
+        
+        if(filtradosParaCopiar.length === 0) {
+            alert("Os pacotes exibidos já constam como entregues. Nada para copiar.");
+            return;
         }
 
-        window.copyText = function(btn) {
-            const txt = btn.parentElement.nextElementSibling.value;
-            navigator.clipboard.writeText(txt).then(() => { btn.textContent = "Copiado!"; setTimeout(() => btn.textContent = "Copiar", 1500); });
-        }
+        const listaJMS = filtradosParaCopiar.map(item => item.jms).join('\n');
+        navigator.clipboard.writeText(listaJMS).then(() => {
+            alert(`✅ ${filtradosParaCopiar.length} códigos de pacotes PENDENTES copiados com sucesso!\n(Pacotes entregues foram ignorados na cópia)`);
+        }).catch(err => {
+            alert("Erro ao copiar.");
+        });
+    }
 
-        function copyAllCityMessages() {
-            const { city, drivers } = currentCityData;
-            if(!city) return;
-            // Atualizado texto do cabeçalho
-            let fullText = `🚨 *MONITORAMENTO - ${city}* 🚨\nPacotes parados há 2 dias ou mais - Priorizar entrega ou Fazer Devolução\n\n`;
-            Object.keys(drivers).sort().forEach(drv => {
-                const pkgs = drivers[drv]; pkgs.sort((a,b) => b.aging_days - a.aging_days);
-                fullText += `➖➖➖➖➖➖➖➖➖➖\n🚚 *MOTORISTA: ${drv}* (${pkgs.length} pendências)\n` + pkgs.map(p => `📦 ${p.remessa} | ${cleanNome(p.destinatario)} (${p.aging_days} dias) - ${cleanMotivo(p.reason)}`).join('\n') + `\n\n`;
-            });
-            navigator.clipboard.writeText(fullText).then(showToast);
-        }
-
-        function setupSorters() {
-            document.querySelectorAll('th[data-sort]').forEach(th=>th.addEventListener('click',()=>{
-                const id=th.closest('table').id, k=th.dataset.sort;
-                sortStates[id].o = (sortStates[id].c===k && sortStates[id].o==='asc') ? 'desc':'asc';
-                sortStates[id].c = k; update();
-            }));
-        }
-        function updateSortUI(id){
-            const t=document.getElementById(id), s=sortStates[id];
-            t.querySelectorAll('th').forEach(h=>h.className='');
-            t.querySelector(`th[data-sort="${s.c}"]`).classList.add(s.o==='asc'?'sort-asc':'sort-desc');
-        }
-        function setupActions(){
-            document.getElementById('exportButton').addEventListener('click',()=>{
-                const ws = XLSX.utils.json_to_sheet(currentFilteredPackages.map(p=>({Status:p.is_delivered?'ENTREGUE':'PENDENTE',Dias:p.aging_days,Remessa:p.remessa,Destinatario:p.destinatario,Resp:p.responsavel,Motivo:p.reason})));
-                const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Dados"); XLSX.writeFile(wb,"Relatorio_Clean.xlsx");
-            });
-            document.getElementById('copyButton').addEventListener('click',()=>{
-                navigator.clipboard.writeText(currentFilteredPackages.map(p=>p.remessa).join('\n')).then(()=>alert('Códigos Copiados!'));
-            });
-        }
-    </script>
+    function sortTable(campo) {
+        sortDirection = sortDirection * -1;
+        dadosFiltrados.sort((a, b) => {
+            let valA, valB;
+            switch(campo) {
+                case 'jms': valA = a.jms; valB = b.jms; break;
+                case 'responsavel': valA = a.responsavel; valB = b.responsavel; break;
+                case 'data': valA = a.ultimaData.getTime(); valB = b.ultimaData.getTime(); break;
+                case 'dias': valA = a.diasParado; valB = b.diasParado; break;
+                case 'tipo': valA = a.tipoBipagem; valB = b.tipoBipagem; break;
+                case 'base': valA = a.baseEscaneamento; valB = b.baseEscaneamento; break;
+            }
+            if (valA < valB) return -1 * sortDirection;
+            if (valA > valB) return 1 * sortDirection;
+            return 0;
+        });
+        renderizarTabela();
+    }
+</script>
 </body>
 </html>
