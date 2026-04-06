@@ -148,7 +148,7 @@
             padding-bottom: 10px;
         }
 
-        /* --- DINAMIC TEXT --- */
+        /* --- DINAMIC TEXT & BUTTONS --- */
         .dynamic-banner {
             font-size: 1.2rem;
             font-weight: 600;
@@ -156,6 +156,12 @@
             margin-bottom: 15px;
             display: flex;
             align-items: center;
+            gap: 10px;
+        }
+
+        .actions-wrapper {
+            margin-left: auto;
+            display: flex;
             gap: 10px;
         }
 
@@ -273,7 +279,6 @@
             font-size: 0.85rem;
         }
 
-        /* SCROLL CORPORATIVO PARA LISTAS LONGAS */
         .scroll-area {
             max-height: 185px;
             overflow-y: auto;
@@ -325,7 +330,6 @@
         tbody tr:hover { background-color: #f8fafc; }
         tbody tr:nth-child(even) { background-color: #fdfdfd; }
 
-        /* Cores de Linha Específicas */
         tr.row-warning { background-color: var(--alert-yellow-bg) !important; }
         tr.row-warning td { border-bottom-color: var(--alert-yellow-border); }
         
@@ -335,7 +339,6 @@
         tr.row-success { background-color: var(--success-green-bg) !important; }
         tr.row-success td { border-bottom-color: var(--success-green-border); }
 
-        /* Badges */
         .badge {
             padding: 4px 8px;
             border-radius: 4px;
@@ -351,6 +354,8 @@
         .badge-loss { background-color: var(--primary-dark); color: white; border: 1px solid #fff; }
 
         .hidden { display: none !important; }
+        
+        /* Botões */
         .btn-action {
             background-color: var(--accent-blue);
             color: white;
@@ -360,10 +365,15 @@
             cursor: pointer;
             font-size: 0.85rem;
             font-weight: 600;
-            float: right;
             transition: 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
         .btn-action:hover { background-color: #0369a1; }
+
+        .btn-excel { background-color: var(--success-green); }
+        .btn-excel:hover { background-color: #059669; }
         
         #error-message {
             background-color: var(--critical-red-bg);
@@ -381,8 +391,8 @@
 
 <header class="header">
     <div class="header-title">
-        <h1><i class="fa-solid fa-boxes-packing"></i> Monitoramento F RVD</h1>
-        <p>Análise operacional com cálculo de SLA e separação de pacotes entregues</p>
+        <h1><i class="fa-solid fa-boxes-packing"></i> Monitoramento F RVD - GO</h1>
+        <p>Análise operacional com foco em Destinos, SLA e exportação</p>
     </div>
     <div class="upload-block">
         <span id="fileNameDisplay" style="font-size: 0.85rem; color: #cbd5e1;">Nenhum arquivo...</span>
@@ -402,9 +412,14 @@
             <i class="fa-solid fa-crosshairs" style="color: var(--accent-blue)"></i>
             <span id="dynamic-title">0 pacotes exibidos</span>
             
-            <button class="btn-action" onclick="copiarCodigosJMS()">
-                <i class="fa-solid fa-copy"></i> Copiar JMS
-            </button>
+            <div class="actions-wrapper">
+                <button class="btn-action btn-excel" onclick="exportarExcel()">
+                    <i class="fa-solid fa-file-excel"></i> Exportar Excel
+                </button>
+                <button class="btn-action" onclick="copiarCodigosJMS()">
+                    <i class="fa-solid fa-copy"></i> Copiar JMS
+                </button>
+            </div>
         </div>
 
         <div class="kpi-wrapper">
@@ -490,7 +505,7 @@
                             <th onclick="sortTable('data')">Última Movimentação <i class="fa-solid fa-sort"></i></th>
                             <th onclick="sortTable('dias')" style="text-align: center;">Status / Dias <i class="fa-solid fa-sort"></i></th>
                             <th onclick="sortTable('tipo')">Tipo de Bipagem <i class="fa-solid fa-sort"></i></th>
-                            <th onclick="sortTable('base')">Base Atual <i class="fa-solid fa-sort"></i></th>
+                            <th onclick="sortTable('municipio')">Município de Destino <i class="fa-solid fa-sort"></i></th>
                         </tr>
                     </thead>
                     <tbody id="tableBody">
@@ -513,7 +528,6 @@
 
     document.getElementById('fileUpload').addEventListener('change', handleFileUpload);
     
-    // Incluímos o toggleEntregues no array de eventos
     const filterInputs = ['filterJMS', 'filterDateStart', 'filterTipo', 'filterDias', 'filterResponsavel', 'toggleEntregues'];
     filterInputs.forEach(id => {
         const el = document.getElementById(id);
@@ -555,11 +569,11 @@
     }
 
     function validarColunas(primeiraLinha) {
-        const colunasObrigatorias = ["Número de pedido JMS", "Tempo de digitalização", "Tipo de bipagem", "Base de escaneamento"];
+        const colunasObrigatorias = ["Número de pedido JMS", "Tempo de digitalização", "Tipo de bipagem", "Base de escaneamento", "Município de Destino"];
         const colunasEncontradas = Object.keys(primeiraLinha);
         const colunasFaltantes = colunasObrigatorias.filter(col => !colunasEncontradas.includes(col));
         if (colunasFaltantes.length > 0) {
-            throw new Error(`Erro de Estrutura: Faltam as colunas obrigatórias: <b>${colunasFaltantes.join(', ')}</b>`);
+            throw new Error(`Erro de Estrutura: Faltam as colunas: <b>${colunasFaltantes.join(', ')}</b>`);
         }
     }
 
@@ -572,6 +586,7 @@
             let base = linha["Base de escaneamento"];
             const jms = linha["Número de pedido JMS"];
             
+            // FILTRO DE VOLTA PARA F RVD
             if (!base || !jms || !base.toString().includes("F RVD")) return;
 
             let dataBipagem = linha["Tempo de digitalização"];
@@ -585,7 +600,8 @@
                 tipo: linha["Tipo de bipagem"] || "Sem bipagem",
                 base: base,
                 motorista: linha["Correio de coleta ou entrega"] || "",
-                tipoProblematico: linha["Tipo problemático"] || ""
+                tipoProblematico: linha["Tipo problemático"] || "",
+                municipio: linha["Município de Destino"] || "Não informado" // Mapeando o município
             });
         });
 
@@ -597,7 +613,6 @@
             const ultimoRegistro = historico[historico.length - 1];
             const tipoFinalLower = ultimoRegistro.tipo.toLowerCase();
 
-            // 🚨 Identificador de pacote entregue
             const isEntregue = tipoFinalLower.includes("assinatura de encomenda") || tipoFinalLower.includes("entregue");
 
             let responsavelAtual = "Base";
@@ -628,7 +643,6 @@
                 }
             });
 
-            // Se for entregue, não aplicamos a flag de possível perda
             if (isEntregue) flagPerdido = false;
 
             const dataMov = new Date(ultimoRegistro.data.getFullYear(), ultimoRegistro.data.getMonth(), ultimoRegistro.data.getDate());
@@ -642,11 +656,11 @@
                 jms: jms.toString().trim(),
                 ultimaData: ultimoRegistro.data,
                 tipoBipagem: ultimoRegistro.tipo,
-                baseEscaneamento: ultimoRegistro.base,
+                municipioDestino: ultimoRegistro.municipio, // Propriedade salva para a tabela
                 responsavel: responsavelAtual,
                 diasParado: diasParado >= 0 ? diasParado : 0,
                 isPerdido: flagPerdido,
-                isEntregue: isEntregue // Guardamos se foi entregue para o filtro
+                isEntregue: isEntregue
             });
         });
 
@@ -672,10 +686,9 @@
         const minDias = parseInt(document.getElementById('filterDias').value) || 0;
         const showEntregues = document.getElementById('toggleEntregues').value === 'mostrar';
 
-        totalEntreguesNoFiltro = 0; // Reset do KPI
+        totalEntreguesNoFiltro = 0; 
         
         dadosFiltrados = dadosProcessados.filter(item => {
-            // Filtros Gerais
             if (strJMS && !item.jms.toLowerCase().includes(strJMS)) return false;
             if (strResponsavel && item.responsavel !== strResponsavel) return false;
             if (strTipo && item.tipoBipagem !== strTipo) return false;
@@ -685,19 +698,16 @@
             
             if (strDataInicio && localISOTime !== strDataInicio) return false;
 
-            // Se for entregue, apenas computamos pro KPI (ignora validação de dias parado)
             if (item.isEntregue) {
                 totalEntreguesNoFiltro++;
-                if (!showEntregues) return false; // Remove da tabela se opção "Ocultar" estiver ativa
+                if (!showEntregues) return false; 
             } else {
-                // Se NÃO for entregue, aplica o filtro de "Dias Parado Mínimo"
                 if (item.diasParado < minDias) return false;
             }
 
             return true;
         });
 
-        // Ordena colocando os mais críticos primeiro, mas joga os entregues para o final
         dadosFiltrados.sort((a, b) => {
             if (a.isEntregue && !b.isEntregue) return 1;
             if (!a.isEntregue && b.isEntregue) return -1;
@@ -738,7 +748,6 @@
         document.getElementById('kpi-critical').textContent = countCritical;
         document.getElementById('kpi-delivered').textContent = totalEntreguesNoFiltro;
 
-        // 1. Tipos de Bipagem (SEM LIMITE e com Scroll)
         const ulTipos = document.getElementById('list-tipos');
         ulTipos.innerHTML = '';
         const tiposArray = Array.from(tiposMap, ([nome, qtd]) => ({ nome, qtd })).sort((a,b) => b.qtd - a.qtd);
@@ -747,7 +756,6 @@
         });
         if(tiposArray.length === 0) ulTipos.innerHTML = '<li><span style="color: #94a3b8;">Nenhum dado</span></li>';
 
-        // 2. Faixa de Dias (Apenas para não entregues)
         const ulDias = document.getElementById('list-dias');
         ulDias.innerHTML = `
             <li><span>0 a 1 dia (Normal)</span> <span>${range01}</span></li>
@@ -755,7 +763,6 @@
             <li><span style="color:var(--critical-red); font-weight:600;">3+ dias (Crítico)</span> <span>${range3}</span></li>
         `;
 
-        // 3. Mostrar TODOS os responsáveis com scroll
         const ulResponsaveis = document.getElementById('list-responsaveis');
         ulResponsaveis.innerHTML = '';
         const respArray = Array.from(responsaveisMap, ([nome, qtd]) => ({ nome, qtd })).sort((a,b) => b.qtd - a.qtd);
@@ -805,8 +812,7 @@
                 <td>${dataFormatada}</td>
                 <td style="text-align: center;">${infoDias}</td>
                 <td>${item.tipoBipagem}</td>
-                <td>${item.baseEscaneamento}</td>
-            `;
+                <td>${item.municipioDestino}</td> `;
             tbody.appendChild(tr);
         });
 
@@ -815,12 +821,41 @@
         }
     }
 
+    // NOVA FUNÇÃO: EXPORTAR PARA EXCEL
+    function exportarExcel() {
+        if (dadosFiltrados.length === 0) {
+            alert("Não há dados visíveis para exportar.");
+            return;
+        }
+
+        // Mapeia os dados filtrados com os nomes das colunas certinhos para o Excel
+        const dadosExportacao = dadosFiltrados.map(item => {
+            return {
+                "Pedido JMS": item.jms,
+                "Responsável": item.responsavel,
+                "Última Movimentação": item.ultimaData.toLocaleString('pt-BR'),
+                "Dias Parado": item.isEntregue ? "Entregue" : item.diasParado,
+                "Tipo de Bipagem": item.tipoBipagem,
+                "Município de Destino": item.municipioDestino,
+                "Status/Alerta": item.isEntregue ? "Finalizado" : (item.isPerdido ? "Possível Perda" : "Pendente")
+            };
+        });
+
+        // Utiliza o SheetJS para gerar a aba e o arquivo Excel
+        const ws = XLSX.utils.json_to_sheet(dadosExportacao);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Monitoramento F RVD");
+        
+        // Dispara o download
+        XLSX.writeFile(wb, "Monitoramento_F_RVD.xlsx");
+    }
+
     function copiarCodigosJMS() {
         if (dadosFiltrados.length === 0) {
             alert("Não há códigos na tabela para copiar.");
             return;
         }
-        // Ao copiar os códigos, geralmente não queremos copiar os que já estão entregues
+        
         const filtradosParaCopiar = dadosFiltrados.filter(i => !i.isEntregue);
         
         if(filtradosParaCopiar.length === 0) {
@@ -846,7 +881,7 @@
                 case 'data': valA = a.ultimaData.getTime(); valB = b.ultimaData.getTime(); break;
                 case 'dias': valA = a.diasParado; valB = b.diasParado; break;
                 case 'tipo': valA = a.tipoBipagem; valB = b.tipoBipagem; break;
-                case 'base': valA = a.baseEscaneamento; valB = b.baseEscaneamento; break;
+                case 'municipio': valA = a.municipioDestino; valB = b.municipioDestino; break;
             }
             if (valA < valB) return -1 * sortDirection;
             if (valA > valB) return 1 * sortDirection;
