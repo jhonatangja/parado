@@ -33,6 +33,8 @@
             --success-green: #10b981;
             --success-green-bg: #ecfdf5;
             --success-green-border: #d1fae5;
+
+            --purple-alert: #8b5cf6;
             
             --border-radius: 6px;
             --border-color: #e2e8f0;
@@ -346,12 +348,15 @@
             font-weight: 700;
             margin-left: 8px;
             display: inline-block;
+            margin-top: 4px;
         }
 
         .badge-warning { background-color: var(--alert-yellow); color: white; }
         .badge-critical { background-color: var(--critical-red); color: white; }
         .badge-success { background-color: var(--success-green); color: white; }
         .badge-loss { background-color: var(--primary-dark); color: white; border: 1px solid #fff; }
+        .badge-purple { background-color: var(--purple-alert); color: white; }
+        .badge-error { background-color: #b91c1c; color: white; } /* Novo badge Tratativa Incorreta */
 
         .hidden { display: none !important; }
         
@@ -374,6 +379,10 @@
 
         .btn-excel { background-color: var(--success-green); }
         .btn-excel:hover { background-color: #059669; }
+
+        /* Estilo Botão WhatsApp */
+        .btn-whatsapp { background-color: #25D366; }
+        .btn-whatsapp:hover { background-color: #1DA851; }
         
         #error-message {
             background-color: var(--critical-red-bg);
@@ -385,6 +394,71 @@
             font-weight: 500;
         }
 
+        /* --- MODAL COBRANÇA --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(15, 23, 42, 0.7);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 9999;
+            backdrop-filter: blur(3px);
+        }
+
+        .modal-content {
+            background-color: var(--bg-card);
+            width: 90%; max-width: 700px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-md);
+            display: flex; flex-direction: column;
+            max-height: 90vh;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+
+        .modal-header h2 {
+            font-size: 1.2rem;
+            color: var(--primary-dark);
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        .btn-close {
+            background: none; border: none; font-size: 1.2rem;
+            cursor: pointer; color: var(--text-muted);
+        }
+
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .modal-body select {
+            width: 100%; padding: 12px; margin-bottom: 15px;
+            border: 1px solid var(--border-color); border-radius: 4px;
+            font-size: 1rem; color: var(--text-main); font-family: inherit;
+        }
+
+        .modal-body select optgroup {
+            font-weight: bold; color: var(--text-muted);
+        }
+
+        .modal-body textarea {
+            width: 100%; height: 350px; padding: 15px;
+            border: 1px solid var(--border-color); border-radius: 4px;
+            font-size: 0.9rem; font-family: monospace; color: var(--text-main);
+            resize: none; background-color: #f8fafc;
+        }
+
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex; justify-content: flex-end; gap: 10px;
+        }
+
     </style>
 </head>
 <body>
@@ -392,7 +466,7 @@
 <header class="header">
     <div class="header-title">
         <h1><i class="fa-solid fa-boxes-packing"></i> Monitoramento F RVD - GO</h1>
-        <p>Análise operacional com foco em Destinos, SLA e exportação</p>
+        <p>Análise operacional com controle de tentativas de entrega e exportação</p>
     </div>
     <div class="upload-block">
         <span id="fileNameDisplay" style="font-size: 0.85rem; color: #cbd5e1;">Nenhum arquivo...</span>
@@ -413,6 +487,9 @@
             <span id="dynamic-title">0 pacotes exibidos</span>
             
             <div class="actions-wrapper">
+                <button class="btn-action btn-whatsapp" onclick="abrirModalCobranca()">
+                    <i class="fa-brands fa-whatsapp"></i> Cobrar Motoristas
+                </button>
                 <button class="btn-action btn-excel" onclick="exportarExcel()">
                     <i class="fa-solid fa-file-excel"></i> Exportar Excel
                 </button>
@@ -452,6 +529,13 @@
                     </select>
                 </div>
                 <div class="filter-group">
+                    <label>Tratativa Incorreta</label>
+                    <select id="filterErrosBaixa">
+                        <option value="">Todas as Movimentações</option>
+                        <option value="erro">Retorno sem Baixa</option>
+                    </select>
+                </div>
+                <div class="filter-group">
                     <label>Busca por JMS</label>
                     <input type="text" id="filterJMS" placeholder="Buscar pedido...">
                 </div>
@@ -462,6 +546,14 @@
                 <div class="filter-group">
                     <label>Tipo de Bipagem</label>
                     <select id="filterTipo"><option value="">Todos</option></select>
+                </div>
+                <div class="filter-group">
+                    <label>Mín. Saídas (Tentativas)</label>
+                    <input type="number" id="filterSaidas" min="0" placeholder="Ex: 2">
+                </div>
+                <div class="filter-group">
+                    <label>Mín. Entradas Galpão</label>
+                    <input type="number" id="filterEntradas" min="0" placeholder="Ex: 8">
                 </div>
                 <div class="filter-group">
                     <label>Dias Parado (Mín)</label>
@@ -517,6 +609,25 @@
     </div>
 </div>
 
+<div id="cobrancaModal" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2><i class="fa-brands fa-whatsapp"></i> Gerar Cobrança - Grupo Motoristas</h2>
+            <button class="btn-close" onclick="fecharModalCobranca()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <label for="selectCidadeCobranca" style="font-weight: 600; font-size: 0.9rem; margin-bottom: 5px; display: block;">Selecione a Opção:</label>
+            <select id="selectCidadeCobranca" onchange="gerarTextoCobranca()">
+                </select>
+            <textarea id="textoCobranca" readonly placeholder="Os recados aparecerão aqui após a seleção..."></textarea>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-action" style="background-color: var(--text-muted);" onclick="fecharModalCobranca()">Fechar</button>
+            <button class="btn-action btn-whatsapp" onclick="copiarTextoCobranca()"><i class="fa-solid fa-copy"></i> Copiar Tudo</button>
+        </div>
+    </div>
+</div>
+
 <script>
     let dadosProcessados = [];
     let dadosFiltrados = [];
@@ -528,7 +639,7 @@
 
     document.getElementById('fileUpload').addEventListener('change', handleFileUpload);
     
-    const filterInputs = ['filterJMS', 'filterDateStart', 'filterTipo', 'filterDias', 'filterResponsavel', 'toggleEntregues'];
+    const filterInputs = ['filterJMS', 'filterDateStart', 'filterTipo', 'filterDias', 'filterResponsavel', 'toggleEntregues', 'filterSaidas', 'filterEntradas', 'filterErrosBaixa'];
     filterInputs.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('input', applyFilters);
@@ -586,7 +697,7 @@
             let base = linha["Base de escaneamento"];
             const jms = linha["Número de pedido JMS"];
             
-            // FILTRO DE VOLTA PARA F RVD
+            // FILTRO DE BASE F RVD
             if (!base || !jms || !base.toString().includes("F RVD")) return;
 
             let dataBipagem = linha["Tempo de digitalização"];
@@ -601,7 +712,7 @@
                 base: base,
                 motorista: linha["Correio de coleta ou entrega"] || "",
                 tipoProblematico: linha["Tipo problemático"] || "",
-                municipio: linha["Município de Destino"] || "Não informado" // Mapeando o município
+                municipio: linha["Município de Destino"] || "Não informado"
             });
         });
 
@@ -618,23 +729,71 @@
             let responsavelAtual = "Base";
             let motoristaSalvoNaMemoria = "";
             let flagPerdido = false;
+            
+            // Contadores
+            let countSaidas = 0;
+            let countEntradasNaoExpedido = 0; 
+            let countAusencia = 0;
+            let isNaBase = true; // Por padrão inicia na base
+
+            // Lógica para detectar Tratativa Incorreta (Saída seguida de Entrada sem Problema)
+            let estadoTratativa = "base"; 
+            let isTratativaIncorreta = false;
 
             historico.forEach(registro => {
                 const tipoLower = registro.tipo.toLowerCase();
+                const tipoProbLower = (registro.tipoProblematico || "").toLowerCase();
 
+                if (tipoProbLower.includes("ausência") || tipoProbLower.includes("ausencia") || tipoProbLower.includes("客户不在")) {
+                    countAusencia++;
+                }
+
+                if (tipoLower.includes("entrada no galpão de pacote não expedido") || tipoLower.includes("entrada no galpao de pacote nao expedido")) {
+                    countEntradasNaoExpedido++;
+                }
+
+                // IDENTIFICAÇÃO DE ESTADOS PARA A TRATATIVA INCORRETA E RESPONSABILIDADE
                 if (tipoLower.includes("saída para entrega") || tipoLower.includes("saida para entrega")) {
+                    estadoTratativa = "na_rua";
                     motoristaSalvoNaMemoria = registro.motorista || motoristaSalvoNaMemoria;
-                    responsavelAtual = motoristaSalvoNaMemoria || "Motorista (Sem Nome)";
+                    
+                    if (!motoristaSalvoNaMemoria || motoristaSalvoNaMemoria.trim() === "") {
+                        responsavelAtual = registro.base;
+                        isNaBase = true;
+                    } else {
+                        responsavelAtual = motoristaSalvoNaMemoria;
+                        isNaBase = false;
+                    }
                     flagPerdido = false;
-                } else if (tipoLower.includes("problemático") || tipoLower.includes("problematico") || registro.tipoProblematico) {
-                    responsavelAtual = motoristaSalvoNaMemoria || "Motorista (Sem Nome)";
+                    countSaidas++; 
+                } 
+                else if (tipoLower.includes("problemático") || tipoLower.includes("problematico") || registro.tipoProblematico) {
+                    estadoTratativa = "problema"; // Motorista deu a baixa correta
+                    
+                    if (!motoristaSalvoNaMemoria || motoristaSalvoNaMemoria.trim() === "") {
+                        responsavelAtual = registro.base;
+                        isNaBase = true;
+                    } else {
+                        responsavelAtual = motoristaSalvoNaMemoria;
+                        isNaBase = false;
+                    }
                     flagPerdido = false;
-                } else if (tipoLower.includes("entrada no galpão") || tipoLower.includes("entrada no galpao")) {
+                } 
+                else if (tipoLower.includes("entrada no galpão") || tipoLower.includes("entrada no galpao")) {
+                    // SE ESTAVA NA RUA E ENTROU NO GALPÃO SEM PASSAR PELO STATUS "PROBLEMA" = TRATATIVA INCORRETA
+                    if (estadoTratativa === "na_rua") {
+                        isTratativaIncorreta = true;
+                    }
+                    
+                    estadoTratativa = "base";
                     responsavelAtual = registro.base;
-                    motoristaSalvoNaMemoria = "";
+                    motoristaSalvoNaMemoria = ""; // Reseta o motorista
+                    isNaBase = true;
                     flagPerdido = false;
-                } else {
+                } 
+                else {
                     responsavelAtual = registro.base;
+                    isNaBase = true;
                     if (tipoLower.includes("recebimento") || tipoLower.includes("descarga") || tipoLower.includes("chegada")) {
                         flagPerdido = true;
                     } else {
@@ -656,11 +815,17 @@
                 jms: jms.toString().trim(),
                 ultimaData: ultimoRegistro.data,
                 tipoBipagem: ultimoRegistro.tipo,
-                municipioDestino: ultimoRegistro.municipio, // Propriedade salva para a tabela
+                ultimoTipoProblematico: ultimoRegistro.tipoProblematico || "",
+                countAusencia: countAusencia,
+                municipioDestino: ultimoRegistro.municipio,
                 responsavel: responsavelAtual,
                 diasParado: diasParado >= 0 ? diasParado : 0,
+                qtdSaidas: countSaidas, 
+                qtdEntradasNaoExpedido: countEntradasNaoExpedido, 
                 isPerdido: flagPerdido,
-                isEntregue: isEntregue
+                isEntregue: isEntregue,
+                isNaBase: isNaBase,
+                isTratativaIncorreta: isTratativaIncorreta // Nova flag salva aqui
             });
         });
 
@@ -684,6 +849,9 @@
         const strDataInicio = document.getElementById('filterDateStart').value;
         const strTipo = document.getElementById('filterTipo').value;
         const minDias = parseInt(document.getElementById('filterDias').value) || 0;
+        const minSaidas = parseInt(document.getElementById('filterSaidas').value) || 0;
+        const minEntradas = parseInt(document.getElementById('filterEntradas').value) || 0; 
+        const strErroBaixa = document.getElementById('filterErrosBaixa').value; // Filtro Novo
         const showEntregues = document.getElementById('toggleEntregues').value === 'mostrar';
 
         totalEntreguesNoFiltro = 0; 
@@ -692,6 +860,11 @@
             if (strJMS && !item.jms.toLowerCase().includes(strJMS)) return false;
             if (strResponsavel && item.responsavel !== strResponsavel) return false;
             if (strTipo && item.tipoBipagem !== strTipo) return false;
+            if (item.qtdSaidas < minSaidas) return false;
+            if (item.qtdEntradasNaoExpedido < minEntradas) return false;
+            
+            // Filtro Tratativa Incorreta
+            if (strErroBaixa === 'erro' && !item.isTratativaIncorreta) return false;
 
             const offset = item.ultimaData.getTimezoneOffset() * 60000;
             const localISOTime = (new Date(item.ultimaData.getTime() - offset)).toISOString().split('T')[0];
@@ -783,6 +956,19 @@
             let badges = "";
             let infoDias = `<b style="font-size: 1.1em;">${item.diasParado}</b>`;
 
+            if (item.qtdSaidas >= 2 && !item.isEntregue) {
+                badges += `<span class="badge badge-purple"><i class="fa-solid fa-rotate-right"></i> ${item.qtdSaidas} Saídas</span>`;
+            }
+
+            if (item.qtdEntradasNaoExpedido >= 8 && !item.isEntregue) {
+                badges += `<span class="badge" style="background-color: #ea580c; color: white;"><i class="fa-solid fa-repeat"></i> ${item.qtdEntradasNaoExpedido} Entradas G.</span>`;
+            }
+
+            // ALERTA VISUAL: Tratativa Incorreta
+            if (item.isTratativaIncorreta && !item.isEntregue) {
+                badges += `<span class="badge badge-error"><i class="fa-solid fa-ban"></i> RETORNO S/ BAIXA</span>`;
+            }
+
             if (item.isEntregue) {
                 tr.classList.add('row-success');
                 badges += `<span class="badge badge-success"><i class="fa-solid fa-check"></i> ENTREGUE</span>`;
@@ -807,12 +993,13 @@
             });
 
             tr.innerHTML = `
-                <td><b>${item.jms}</b> <br> ${badges}</td>
+                <td><b>${item.jms}</b> <br> <div style="margin-top:2px;">${badges}</div></td>
                 <td>${item.responsavel}</td>
                 <td>${dataFormatada}</td>
                 <td style="text-align: center;">${infoDias}</td>
                 <td>${item.tipoBipagem}</td>
-                <td>${item.municipioDestino}</td> `;
+                <td>${item.municipioDestino}</td>
+            `;
             tbody.appendChild(tr);
         });
 
@@ -821,74 +1008,226 @@
         }
     }
 
-    // NOVA FUNÇÃO: EXPORTAR PARA EXCEL
     function exportarExcel() {
         if (dadosFiltrados.length === 0) {
             alert("Não há dados visíveis para exportar.");
             return;
         }
 
-        // Mapeia os dados filtrados com os nomes das colunas certinhos para o Excel
         const dadosExportacao = dadosFiltrados.map(item => {
             return {
                 "Pedido JMS": item.jms,
                 "Responsável": item.responsavel,
                 "Última Movimentação": item.ultimaData.toLocaleString('pt-BR'),
                 "Dias Parado": item.isEntregue ? "Entregue" : item.diasParado,
+                "Tentativas de Entrega": item.qtdSaidas,
+                "Entradas (Não Expedido)": item.qtdEntradasNaoExpedido,
+                "Erro de Baixa (Tratativa)": item.isTratativaIncorreta && !item.isEntregue ? "Sim (Retorno s/ Problema)" : "OK",
                 "Tipo de Bipagem": item.tipoBipagem,
                 "Município de Destino": item.municipioDestino,
                 "Status/Alerta": item.isEntregue ? "Finalizado" : (item.isPerdido ? "Possível Perda" : "Pendente")
             };
         });
 
-        // Utiliza o SheetJS para gerar a aba e o arquivo Excel
         const ws = XLSX.utils.json_to_sheet(dadosExportacao);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Monitoramento F RVD");
-        
-        // Dispara o download
         XLSX.writeFile(wb, "Monitoramento_F_RVD.xlsx");
     }
 
     function copiarCodigosJMS() {
-        if (dadosFiltrados.length === 0) {
-            alert("Não há códigos na tabela para copiar.");
-            return;
-        }
-        
+        if (dadosFiltrados.length === 0) return alert("Não há códigos na tabela para copiar.");
         const filtradosParaCopiar = dadosFiltrados.filter(i => !i.isEntregue);
-        
-        if(filtradosParaCopiar.length === 0) {
-            alert("Os pacotes exibidos já constam como entregues. Nada para copiar.");
-            return;
-        }
+        if(filtradosParaCopiar.length === 0) return alert("Os pacotes exibidos já constam como entregues. Nada para copiar.");
 
         const listaJMS = filtradosParaCopiar.map(item => item.jms).join('\n');
         navigator.clipboard.writeText(listaJMS).then(() => {
-            alert(`✅ ${filtradosParaCopiar.length} códigos de pacotes PENDENTES copiados com sucesso!\n(Pacotes entregues foram ignorados na cópia)`);
-        }).catch(err => {
-            alert("Erro ao copiar.");
+            alert(`✅ ${filtradosParaCopiar.length} códigos de pacotes PENDENTES copiados com sucesso!`);
         });
     }
 
-    function sortTable(campo) {
-        sortDirection = sortDirection * -1;
-        dadosFiltrados.sort((a, b) => {
-            let valA, valB;
-            switch(campo) {
-                case 'jms': valA = a.jms; valB = b.jms; break;
-                case 'responsavel': valA = a.responsavel; valB = b.responsavel; break;
-                case 'data': valA = a.ultimaData.getTime(); valB = b.ultimaData.getTime(); break;
-                case 'dias': valA = a.diasParado; valB = b.diasParado; break;
-                case 'tipo': valA = a.tipoBipagem; valB = b.tipoBipagem; break;
-                case 'municipio': valA = a.municipioDestino; valB = b.municipioDestino; break;
+    /* =========================================
+       NOVAS FUNÇÕES - COBRANÇA WHATSAPP
+       ========================================= */
+
+    function abrirModalCobranca() {
+        if (dadosProcessados.length === 0) {
+            alert("Carregue uma planilha primeiro.");
+            return;
+        }
+
+        const select = document.getElementById('selectCidadeCobranca');
+        select.innerHTML = '<option value="">Selecione uma opção...</option>';
+        document.getElementById('textoCobranca').value = "";
+
+        const cidadesComAtraso = new Set();
+        let temBase = false;
+
+        dadosProcessados.forEach(item => {
+            if (!item.isEntregue && item.diasParado >= 2) {
+                if (item.isNaBase) {
+                    temBase = true; 
+                } else {
+                    cidadesComAtraso.add(item.municipioDestino); 
+                }
             }
-            if (valA < valB) return -1 * sortDirection;
-            if (valA > valB) return 1 * sortDirection;
-            return 0;
         });
-        renderizarTabela();
+
+        if (temBase) {
+            select.add(new Option("🏢 COBRAR PARADOS NA BASE (Ciribaldo)", "__BASE__"));
+        }
+
+        if (cidadesComAtraso.size > 0) {
+            const optGroup = document.createElement('optgroup');
+            optGroup.label = "Cobrar Motoristas por Cidade";
+            
+            Array.from(cidadesComAtraso).sort().forEach(cidade => {
+                const opt = new Option(`📍 ${cidade}`, cidade);
+                optGroup.appendChild(opt);
+            });
+            select.appendChild(optGroup);
+        } else if (!temBase) {
+            alert("Nenhuma pendência crítica (2+ dias) encontrada nos dados atuais.");
+            return;
+        }
+
+        document.getElementById('cobrancaModal').classList.remove('hidden');
     }
+
+    function fecharModalCobranca() {
+        document.getElementById('cobrancaModal').classList.add('hidden');
+    }
+
+    function definirAcaoExigida(item) {
+        const bipagemStr = item.tipoBipagem.toLowerCase();
+        const probStr = (item.ultimoTipoProblematico || "").toLowerCase();
+
+        if (bipagemStr.includes("saída para entrega") || bipagemStr.includes("saida para entrega")) {
+            return "❌ Faltando finalização. Pacote em aberto! Por favor, finalizar a entrega ou lançar a baixa problemática no aplicativo urgentemente.";
+        }
+
+        if (bipagemStr.includes("problemático") || bipagemStr.includes("problematico") || probStr !== "") {
+            
+            if (probStr.includes("endereço") || probStr.includes("endereco") || probStr.includes("recusa") || probStr.includes("impossibilidade") || probStr.includes("地址信息错误") || probStr.includes("无理由拒收") || probStr.includes("客户地址无法进入")) {
+                return "🔄 DEVOLVER NO GALPÃO. (Motivo: Endereço Incorreto / Recusa / Impossibilidade de Chegar).";
+            }
+            
+            if (probStr.includes("ausência") || probStr.includes("ausencia") || probStr.includes("客户不在")) {
+                if (item.countAusencia >= 3) {
+                    return `🔄 DEVOLVER NO GALPÃO. (Motivo: Ausência do cliente. Limite de ${item.countAusencia} tentativas atingido).`;
+                } else {
+                    return `🚚 REALIZAR NOVA TENTATIVA. (Motivo: Ausência do cliente. Você tem ${item.countAusencia} tentativas registradas. Faça mais uma tentativa).`;
+                }
+            }
+            
+            return "⚠️ Verificar motivo e dar tratativa (Entrega ou Devolução).";
+        }
+
+        return "⚠️ Pacote sem baixa final. Favor verificar no app.";
+    }
+
+    function gerarTextoCobranca() {
+        const selecao = document.getElementById('selectCidadeCobranca').value;
+        const textarea = document.getElementById('textoCobranca');
+
+        if (!selecao) {
+            textarea.value = "";
+            return;
+        }
+
+        // SE A OPÇÃO ESCOLHIDA FOR A BASE (CIRIBALDO)
+        if (selecao === "__BASE__") {
+            const pacotesBase = dadosProcessados.filter(item => 
+                !item.isEntregue && item.diasParado >= 2 && item.isNaBase
+            );
+
+            let texto = `🚨 *ATENÇÃO CIRIBALDO - PENDÊNCIAS NA BASE (2+ DIAS)* 🚨\n\n`;
+            texto += `Líder, favor verificar os seguintes pacotes que constam retidos no galpão sem motorista atrelado:\n\n`;
+
+            const agrupadoPorCidade = {};
+            pacotesBase.forEach(pacote => {
+                if (!agrupadoPorCidade[pacote.municipioDestino]) agrupadoPorCidade[pacote.municipioDestino] = [];
+                
+                const tipoLimpo = pacote.ultimoTipoProblematico ? pacote.ultimoTipoProblematico.replace(/[\u4e00-\u9fa5]/g, '') : "";
+                const tipoDisplay = tipoLimpo ? `${pacote.tipoBipagem} (${tipoLimpo})` : pacote.tipoBipagem;
+                
+                // Adiciona o alerta se o pacote foi retornado sem baixa
+                const alertaErro = pacote.isTratativaIncorreta ? " 🚫 [MOTORISTA NÃO DEU BAIXA]" : "";
+                
+                agrupadoPorCidade[pacote.municipioDestino].push(`${pacote.jms} (${pacote.diasParado} dias parado) - ${tipoDisplay}${alertaErro}`);
+            });
+
+            for (const [cidadeBase, listaJMS] of Object.entries(agrupadoPorCidade)) {
+                texto += `📍 *Destino: ${cidadeBase}*\n`;
+                texto += `Pedidos :\n${listaJMS.join('\n')}\n\n`;
+            }
+
+            textarea.value = texto;
+            return;
+        }
+
+        // SE A OPÇÃO ESCOLHIDA FOR UMA CIDADE NORMAL DE MOTORISTAS
+        const cidade = selecao;
+        const pacotesCobranca = dadosProcessados.filter(item => 
+            item.municipioDestino === cidade && 
+            !item.isEntregue && 
+            item.diasParado >= 2 &&
+            !item.isNaBase 
+        );
+
+        const agrupadoPorMotorista = {};
+        pacotesCobranca.forEach(item => {
+            if (!agrupadoPorMotorista[item.responsavel]) {
+                agrupadoPorMotorista[item.responsavel] = [];
+            }
+            agrupadoPorMotorista[item.responsavel].push(item);
+        });
+
+        let texto = `🚨 *ATENÇÃO MOTORISTAS - PENDÊNCIAS (2+ DIAS)* 🚨\n📍 Cidade: *${cidade}*\n\n`;
+
+        for (const [motorista, pacotes] of Object.entries(agrupadoPorMotorista)) {
+            texto += `👤 MOTORISTA: *${motorista}* - ${pacotes.length} PACOTES CRÍTICOS\n\n`;
+            
+            const pacotesPorAcao = {};
+            pacotes.forEach(pacote => {
+                const acao = definirAcaoExigida(pacote);
+                if (!pacotesPorAcao[acao]) {
+                    pacotesPorAcao[acao] = [];
+                }
+                pacotesPorAcao[acao].push(`${pacote.jms} (${pacote.diasParado} dias parado)`);
+            });
+
+            for (const [acao, listaJMS] of Object.entries(pacotesPorAcao)) {
+                texto += `🛑 AÇÃO: ${acao}\n\n`;
+                texto += `Pedidos :\n`;
+                texto += `${listaJMS.join('\n')}\n\n`;
+            }
+            
+            texto += `--------------------------------------------------\n\n`;
+        }
+
+        if (Object.keys(agrupadoPorMotorista).length === 0) {
+            texto = `✅ Nenhuma pendência crítica para motoristas encontrada em ${cidade}.`;
+        }
+
+        textarea.value = texto;
+    }
+
+    function copiarTextoCobranca() {
+        const textarea = document.getElementById('textoCobranca');
+        if (!textarea.value || textarea.value.includes("Nenhuma pendência") || textarea.value.includes("Os recados aparecerão")) {
+            alert("Não há texto de cobrança válido para copiar.");
+            return;
+        }
+
+        textarea.select();
+        navigator.clipboard.writeText(textarea.value).then(() => {
+            alert("✅ Texto copiado com sucesso! Agora é só colar no grupo do WhatsApp.");
+        }).catch(err => {
+            alert("Erro ao copiar o texto.");
+        });
+    }
+
 </script>
 </body>
 </html>
