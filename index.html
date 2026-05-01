@@ -356,7 +356,8 @@
         .badge-success { background-color: var(--success-green); color: white; }
         .badge-loss { background-color: var(--primary-dark); color: white; border: 1px solid #fff; }
         .badge-purple { background-color: var(--purple-alert); color: white; }
-        .badge-error { background-color: #b91c1c; color: white; } /* Novo badge Tratativa Incorreta */
+        .badge-error { background-color: #b91c1c; color: white; } 
+        .badge-marcos { background-color: #9333ea; color: white; border: 1px solid #7e22ce;} /* Novo Badge Marcos */
 
         .hidden { display: none !important; }
         
@@ -488,7 +489,7 @@
             
             <div class="actions-wrapper">
                 <button class="btn-action btn-whatsapp" onclick="abrirModalCobranca()">
-                    <i class="fa-brands fa-whatsapp"></i> Cobrar Motoristas
+                    <i class="fa-brands fa-whatsapp"></i> Gerar Cobranças
                 </button>
                 <button class="btn-action btn-excel" onclick="exportarExcel()">
                     <i class="fa-solid fa-file-excel"></i> Exportar Excel
@@ -529,10 +530,17 @@
                     </select>
                 </div>
                 <div class="filter-group">
-                    <label>Tratativa Incorreta</label>
-                    <select id="filterErrosBaixa">
-                        <option value="">Todas as Movimentações</option>
-                        <option value="erro">Retorno sem Baixa</option>
+                    <label style="color: #b91c1c;">Alerta: Bipagem Fictícia</label>
+                    <select id="filterFicticio">
+                        <option value="">Todos</option>
+                        <option value="preso">Em Rota há 4+ Dias</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label style="color: #9333ea;">Falha P. Contas (Marcos)</label>
+                    <select id="filterPrestacaoConta">
+                        <option value="">Todas</option>
+                        <option value="falha">Apenas Falhas (Devolução Indevida)</option>
                     </select>
                 </div>
                 <div class="filter-group">
@@ -558,6 +566,13 @@
                 <div class="filter-group">
                     <label>Dias Parado (Mín)</label>
                     <input type="number" id="filterDias" min="0" placeholder="Ex: 2">
+                </div>
+                <div class="filter-group" style="display:none;"> <!-- Ocultado para espaço, uso opcional -->
+                    <label>Tratativa Incorreta</label>
+                    <select id="filterErrosBaixa">
+                        <option value="">Todas</option>
+                        <option value="erro">Retorno sem Baixa</option>
+                    </select>
                 </div>
                 <div class="filter-group">
                     <label>Data Específica</label>
@@ -612,11 +627,11 @@
 <div id="cobrancaModal" class="modal-overlay hidden">
     <div class="modal-content">
         <div class="modal-header">
-            <h2><i class="fa-brands fa-whatsapp"></i> Gerar Cobrança - Grupo Motoristas</h2>
+            <h2><i class="fa-brands fa-whatsapp"></i> Gerar Cobrança - Automação WhatsApp</h2>
             <button class="btn-close" onclick="fecharModalCobranca()"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body">
-            <label for="selectCidadeCobranca" style="font-weight: 600; font-size: 0.9rem; margin-bottom: 5px; display: block;">Selecione a Opção:</label>
+            <label for="selectCidadeCobranca" style="font-weight: 600; font-size: 0.9rem; margin-bottom: 5px; display: block;">Selecione a Opção de Cobrança:</label>
             <select id="selectCidadeCobranca" onchange="gerarTextoCobranca()">
                 </select>
             <textarea id="textoCobranca" readonly placeholder="Os recados aparecerão aqui após a seleção..."></textarea>
@@ -639,7 +654,8 @@
 
     document.getElementById('fileUpload').addEventListener('change', handleFileUpload);
     
-    const filterInputs = ['filterJMS', 'filterDateStart', 'filterTipo', 'filterDias', 'filterResponsavel', 'toggleEntregues', 'filterSaidas', 'filterEntradas', 'filterErrosBaixa'];
+    // Adicionado o 'filterPrestacaoConta' na lista
+    const filterInputs = ['filterJMS', 'filterDateStart', 'filterTipo', 'filterDias', 'filterResponsavel', 'toggleEntregues', 'filterSaidas', 'filterEntradas', 'filterErrosBaixa', 'filterFicticio', 'filterPrestacaoConta'];
     filterInputs.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('input', applyFilters);
@@ -730,33 +746,48 @@
             let motoristaSalvoNaMemoria = "";
             let flagPerdido = false;
             
-            // Contadores
+            // Contadores e Lógicas
             let countSaidas = 0;
             let countEntradasNaoExpedido = 0; 
             let countAusencia = 0;
-            let isNaBase = true; // Por padrão inicia na base
-
-            // Lógica para detectar Tratativa Incorreta (Saída seguida de Entrada sem Problema)
+            let isNaBase = true;
+            let primeiraSaidaData = null; 
+            
+            // Lógicas Prestação de Contas & Tratativa Incorreta
             let estadoTratativa = "base"; 
             let isTratativaIncorreta = false;
+            
+            let datasAusencia = new Set(); // Guarda os dias (YYY-MM-DD) das ausências
+            let isFalhaPrestacaoConta = false;
+            let motivoFalhaPrestacao = "";
+            let ultimoProblemaConhecido = "";
 
             historico.forEach(registro => {
                 const tipoLower = registro.tipo.toLowerCase();
                 const tipoProbLower = (registro.tipoProblematico || "").toLowerCase();
 
+                // Rastreador de Ausências (Dias distintos)
                 if (tipoProbLower.includes("ausência") || tipoProbLower.includes("ausencia") || tipoProbLower.includes("客户不在")) {
                     countAusencia++;
+                    const dataLocal = new Date(registro.data.getTime() - (registro.data.getTimezoneOffset() * 60000));
+                    datasAusencia.add(dataLocal.toISOString().split('T')[0]);
                 }
 
                 if (tipoLower.includes("entrada no galpão de pacote não expedido") || tipoLower.includes("entrada no galpao de pacote nao expedido")) {
                     countEntradasNaoExpedido++;
                 }
 
-                // IDENTIFICAÇÃO DE ESTADOS PARA A TRATATIVA INCORRETA E RESPONSABILIDADE
+                // MÁQUINA DE ESTADOS - Movimentações
                 if (tipoLower.includes("saída para entrega") || tipoLower.includes("saida para entrega")) {
                     estadoTratativa = "na_rua";
                     motoristaSalvoNaMemoria = registro.motorista || motoristaSalvoNaMemoria;
                     
+                    if (!primeiraSaidaData) primeiraSaidaData = registro.data; 
+                    
+                    // Reseta falha caso pacote volte para a rua
+                    isFalhaPrestacaoConta = false; 
+                    motivoFalhaPrestacao = "";
+
                     if (!motoristaSalvoNaMemoria || motoristaSalvoNaMemoria.trim() === "") {
                         responsavelAtual = registro.base;
                         isNaBase = true;
@@ -768,7 +799,8 @@
                     countSaidas++; 
                 } 
                 else if (tipoLower.includes("problemático") || tipoLower.includes("problematico") || registro.tipoProblematico) {
-                    estadoTratativa = "problema"; // Motorista deu a baixa correta
+                    estadoTratativa = "problema"; 
+                    ultimoProblemaConhecido = tipoProbLower; // Salva para checar na devolução
                     
                     if (!motoristaSalvoNaMemoria || motoristaSalvoNaMemoria.trim() === "") {
                         responsavelAtual = registro.base;
@@ -780,14 +812,26 @@
                     flagPerdido = false;
                 } 
                 else if (tipoLower.includes("entrada no galpão") || tipoLower.includes("entrada no galpao")) {
-                    // SE ESTAVA NA RUA E ENTROU NO GALPÃO SEM PASSAR PELO STATUS "PROBLEMA" = TRATATIVA INCORRETA
+                    
+                    // VERIFICAÇÃO DE FALHA NA PRESTAÇÃO DE CONTAS
                     if (estadoTratativa === "na_rua") {
                         isTratativaIncorreta = true;
+                        isFalhaPrestacaoConta = true;
+                        motivoFalhaPrestacao = "Devolvido ao galpão sem lançar baixa problemática no app.";
+                    } 
+                    else if (estadoTratativa === "problema") {
+                        if (ultimoProblemaConhecido.includes("ausência") || ultimoProblemaConhecido.includes("ausencia") || ultimoProblemaConhecido.includes("客户不在")) {
+                            if (datasAusencia.size < 3) {
+                                isFalhaPrestacaoConta = true;
+                                motivoFalhaPrestacao = `Devolvido ao galpão indevidamente (Apenas ${datasAusencia.size} dia(s) de ausência. O mínimo é 3).`;
+                            }
+                        }
                     }
                     
                     estadoTratativa = "base";
                     responsavelAtual = registro.base;
-                    motoristaSalvoNaMemoria = ""; // Reseta o motorista
+                    motoristaSalvoNaMemoria = ""; 
+                    ultimoProblemaConhecido = ""; 
                     isNaBase = true;
                     flagPerdido = false;
                 } 
@@ -807,6 +851,14 @@
             const dataMov = new Date(ultimoRegistro.data.getFullYear(), ultimoRegistro.data.getMonth(), ultimoRegistro.data.getDate());
             const diffTempo = HOJE.getTime() - dataMov.getTime();
             const diasParado = Math.floor(diffTempo / (1000 * 3600 * 24)); 
+            
+            let diasDesdePrimeiraSaida = 0;
+            if (primeiraSaidaData) {
+                const dataPrimeiraSaidaLimpa = new Date(primeiraSaidaData.getFullYear(), primeiraSaidaData.getMonth(), primeiraSaidaData.getDate());
+                diasDesdePrimeiraSaida = Math.floor((HOJE.getTime() - dataPrimeiraSaidaLimpa.getTime()) / (1000 * 3600 * 24));
+            }
+            
+            const isPresoEmRota = (diasDesdePrimeiraSaida >= 4 && !isEntregue && !isNaBase);
 
             tiposBipagemSet.add(ultimoRegistro.tipo);
             responsaveisSet.add(responsavelAtual);
@@ -817,15 +869,21 @@
                 tipoBipagem: ultimoRegistro.tipo,
                 ultimoTipoProblematico: ultimoRegistro.tipoProblematico || "",
                 countAusencia: countAusencia,
+                diasAusentesUnicos: datasAusencia.size,
                 municipioDestino: ultimoRegistro.municipio,
-                responsavel: responsavelAtual,
+                responsavel: responsavelAtual, // O atual, que se tornou Base
+                responsavelAnterior: motoristaSalvoNaMemoria, // Para sabermos qual motorista devolver indevidamente
                 diasParado: diasParado >= 0 ? diasParado : 0,
                 qtdSaidas: countSaidas, 
                 qtdEntradasNaoExpedido: countEntradasNaoExpedido, 
                 isPerdido: flagPerdido,
                 isEntregue: isEntregue,
                 isNaBase: isNaBase,
-                isTratativaIncorreta: isTratativaIncorreta // Nova flag salva aqui
+                isTratativaIncorreta: isTratativaIncorreta,
+                diasDesdePrimeiraSaida: diasDesdePrimeiraSaida, 
+                isPresoEmRota: isPresoEmRota, 
+                isFalhaPrestacaoConta: isFalhaPrestacaoConta,
+                motivoFalhaPrestacao: motivoFalhaPrestacao
             });
         });
 
@@ -851,7 +909,9 @@
         const minDias = parseInt(document.getElementById('filterDias').value) || 0;
         const minSaidas = parseInt(document.getElementById('filterSaidas').value) || 0;
         const minEntradas = parseInt(document.getElementById('filterEntradas').value) || 0; 
-        const strErroBaixa = document.getElementById('filterErrosBaixa').value; // Filtro Novo
+        const strErroBaixa = document.getElementById('filterErrosBaixa').value; 
+        const strFicticio = document.getElementById('filterFicticio').value; 
+        const strPrestacao = document.getElementById('filterPrestacaoConta').value; 
         const showEntregues = document.getElementById('toggleEntregues').value === 'mostrar';
 
         totalEntreguesNoFiltro = 0; 
@@ -863,8 +923,11 @@
             if (item.qtdSaidas < minSaidas) return false;
             if (item.qtdEntradasNaoExpedido < minEntradas) return false;
             
-            // Filtro Tratativa Incorreta
             if (strErroBaixa === 'erro' && !item.isTratativaIncorreta) return false;
+            if (strFicticio === 'preso' && !item.isPresoEmRota) return false;
+            
+            // FILTRO NOVO: PRESTAÇÃO DE CONTAS
+            if (strPrestacao === 'falha' && !item.isFalhaPrestacaoConta) return false;
 
             const offset = item.ultimaData.getTimezoneOffset() * 60000;
             const localISOTime = (new Date(item.ultimaData.getTime() - offset)).toISOString().split('T')[0];
@@ -964,9 +1027,19 @@
                 badges += `<span class="badge" style="background-color: #ea580c; color: white;"><i class="fa-solid fa-repeat"></i> ${item.qtdEntradasNaoExpedido} Entradas G.</span>`;
             }
 
-            // ALERTA VISUAL: Tratativa Incorreta
-            if (item.isTratativaIncorreta && !item.isEntregue) {
+            if (item.isTratativaIncorreta && !item.isEntregue && !item.isFalhaPrestacaoConta) {
                 badges += `<span class="badge badge-error"><i class="fa-solid fa-ban"></i> RETORNO S/ BAIXA</span>`;
+            }
+
+            // ALERTA VISUAL: PRESTAÇÃO DE CONTAS MARCOS
+            if (item.isFalhaPrestacaoConta && !item.isEntregue) {
+                badges += `<span class="badge badge-marcos" title="${item.motivoFalhaPrestacao}"><i class="fa-solid fa-clipboard-user"></i> FALHA P. CONTAS (MARCOS)</span>`;
+            }
+            
+            // ALERTA VISUAL: Bipagem Fictícia (Burlando SLA)
+            if (item.isPresoEmRota) {
+                badges += `<span class="badge" style="background-color: #000; color: #fff; border: 1px solid #dc2626;"><i class="fa-solid fa-stopwatch"></i> ROTA ${item.diasDesdePrimeiraSaida} DIAS</span>`;
+                infoDias = `<b style="font-size: 1.1em; color: #dc2626;">Fictício (${item.diasDesdePrimeiraSaida}d)</b>`;
             }
 
             if (item.isEntregue) {
@@ -1020,9 +1093,12 @@
                 "Responsável": item.responsavel,
                 "Última Movimentação": item.ultimaData.toLocaleString('pt-BR'),
                 "Dias Parado": item.isEntregue ? "Entregue" : item.diasParado,
+                "Dias Real na Rua": item.diasDesdePrimeiraSaida, 
+                "Bipagem Fictícia": item.isPresoEmRota ? "Sim (Burlando SLA)" : "Não",
+                "Falha Prestação Contas": item.isFalhaPrestacaoConta ? "Sim" : "Não",
+                "Motivo Falha (Marcos)": item.motivoFalhaPrestacao,
                 "Tentativas de Entrega": item.qtdSaidas,
                 "Entradas (Não Expedido)": item.qtdEntradasNaoExpedido,
-                "Erro de Baixa (Tratativa)": item.isTratativaIncorreta && !item.isEntregue ? "Sim (Retorno s/ Problema)" : "OK",
                 "Tipo de Bipagem": item.tipoBipagem,
                 "Município de Destino": item.municipioDestino,
                 "Status/Alerta": item.isEntregue ? "Finalizado" : (item.isPerdido ? "Possível Perda" : "Pendente")
@@ -1062,16 +1138,26 @@
 
         const cidadesComAtraso = new Set();
         let temBase = false;
+        let temFalhaPrestacao = false;
 
         dadosProcessados.forEach(item => {
-            if (!item.isEntregue && item.diasParado >= 2) {
-                if (item.isNaBase) {
+            if (!item.isEntregue && (item.diasParado >= 2 || item.isPresoEmRota)) {
+                if (item.isNaBase && !item.isPresoEmRota && !item.isFalhaPrestacaoConta) {
                     temBase = true; 
-                } else {
+                } else if (!item.isNaBase) {
                     cidadesComAtraso.add(item.municipioDestino); 
                 }
             }
+            // Verifica se existe alguma falha de prestação de contas pendente no galpão
+            if (!item.isEntregue && item.isFalhaPrestacaoConta && item.isNaBase) {
+                temFalhaPrestacao = true;
+            }
         });
+
+        // ADICIONA MARCOS VINICIUS
+        if (temFalhaPrestacao) {
+            select.add(new Option("📋 COBRAR PRESTAÇÃO DE CONTAS (Marcos Vinícius)", "__MARCOS__"));
+        }
 
         if (temBase) {
             select.add(new Option("🏢 COBRAR PARADOS NA BASE (Ciribaldo)", "__BASE__"));
@@ -1086,8 +1172,8 @@
                 optGroup.appendChild(opt);
             });
             select.appendChild(optGroup);
-        } else if (!temBase) {
-            alert("Nenhuma pendência crítica (2+ dias) encontrada nos dados atuais.");
+        } else if (!temBase && !temFalhaPrestacao) {
+            alert("Nenhuma pendência crítica encontrada nos dados atuais.");
             return;
         }
 
@@ -1099,6 +1185,10 @@
     }
 
     function definirAcaoExigida(item) {
+        if (item.isPresoEmRota) {
+            return `🚫 ALERTA GRAVE - RETENÇÃO: Este pacote está com você há ${item.diasDesdePrimeiraSaida} dias. O sistema acusa bipagem repetida de saída sem finalização real. DEVOLVA IMEDIATAMENTE NO GALPÃO OU FINALIZE.`;
+        }
+        
         const bipagemStr = item.tipoBipagem.toLowerCase();
         const probStr = (item.ultimoTipoProblematico || "").toLowerCase();
 
@@ -1135,10 +1225,30 @@
             return;
         }
 
-        // SE A OPÇÃO ESCOLHIDA FOR A BASE (CIRIBALDO)
+        // LÓGICA MARCOS VINICIUS
+        if (selecao === "__MARCOS__") {
+            const pacotesMarcos = dadosProcessados.filter(item => 
+                !item.isEntregue && item.isFalhaPrestacaoConta && item.isNaBase
+            );
+
+            let texto = `🚨 *ATENÇÃO MARCOS VINÍCIUS - FALHA NA PRESTAÇÃO DE CONTAS* 🚨\n\n`;
+            texto += `Marcos, favor verificar e cobrar os motoristas sobre os pacotes abaixo. Eles foram devolvidos ao galpão INDEVIDAMENTE (sem lançar problema ou sem bater as 3 ausências):\n\n`;
+
+            pacotesMarcos.forEach(pacote => {
+                texto += `📦 *Pedido:* ${pacote.jms}\n`;
+                texto += `👤 *Motorista:* ${pacote.responsavelAnterior || "Desconhecido"}\n`;
+                texto += `🛑 *Motivo:* ${pacote.motivoFalhaPrestacao}\n`;
+                texto += `-------------------------------------------\n`;
+            });
+
+            textarea.value = texto;
+            return;
+        }
+
+        // LÓGICA BASE (CIRIBALDO)
         if (selecao === "__BASE__") {
             const pacotesBase = dadosProcessados.filter(item => 
-                !item.isEntregue && item.diasParado >= 2 && item.isNaBase
+                !item.isEntregue && item.diasParado >= 2 && item.isNaBase && !item.isPresoEmRota && !item.isFalhaPrestacaoConta
             );
 
             let texto = `🚨 *ATENÇÃO CIRIBALDO - PENDÊNCIAS NA BASE (2+ DIAS)* 🚨\n\n`;
@@ -1151,10 +1261,7 @@
                 const tipoLimpo = pacote.ultimoTipoProblematico ? pacote.ultimoTipoProblematico.replace(/[\u4e00-\u9fa5]/g, '') : "";
                 const tipoDisplay = tipoLimpo ? `${pacote.tipoBipagem} (${tipoLimpo})` : pacote.tipoBipagem;
                 
-                // Adiciona o alerta se o pacote foi retornado sem baixa
-                const alertaErro = pacote.isTratativaIncorreta ? " 🚫 [MOTORISTA NÃO DEU BAIXA]" : "";
-                
-                agrupadoPorCidade[pacote.municipioDestino].push(`${pacote.jms} (${pacote.diasParado} dias parado) - ${tipoDisplay}${alertaErro}`);
+                agrupadoPorCidade[pacote.municipioDestino].push(`${pacote.jms} (${pacote.diasParado} dias parado) - ${tipoDisplay}`);
             });
 
             for (const [cidadeBase, listaJMS] of Object.entries(agrupadoPorCidade)) {
@@ -1166,12 +1273,12 @@
             return;
         }
 
-        // SE A OPÇÃO ESCOLHIDA FOR UMA CIDADE NORMAL DE MOTORISTAS
+        // LÓGICA CIDADES MOTORISTAS
         const cidade = selecao;
         const pacotesCobranca = dadosProcessados.filter(item => 
             item.municipioDestino === cidade && 
             !item.isEntregue && 
-            item.diasParado >= 2 &&
+            (item.diasParado >= 2 || item.isPresoEmRota) &&
             !item.isNaBase 
         );
 
@@ -1183,7 +1290,7 @@
             agrupadoPorMotorista[item.responsavel].push(item);
         });
 
-        let texto = `🚨 *ATENÇÃO MOTORISTAS - PENDÊNCIAS (2+ DIAS)* 🚨\n📍 Cidade: *${cidade}*\n\n`;
+        let texto = `🚨 *ATENÇÃO MOTORISTAS - PENDÊNCIAS CRÍTICAS* 🚨\n📍 Cidade: *${cidade}*\n\n`;
 
         for (const [motorista, pacotes] of Object.entries(agrupadoPorMotorista)) {
             texto += `👤 MOTORISTA: *${motorista}* - ${pacotes.length} PACOTES CRÍTICOS\n\n`;
@@ -1194,7 +1301,8 @@
                 if (!pacotesPorAcao[acao]) {
                     pacotesPorAcao[acao] = [];
                 }
-                pacotesPorAcao[acao].push(`${pacote.jms} (${pacote.diasParado} dias parado)`);
+                const textoDias = pacote.isPresoEmRota ? `${pacote.diasDesdePrimeiraSaida} dias em rota` : `${pacote.diasParado} dias parado`;
+                pacotesPorAcao[acao].push(`${pacote.jms} (${textoDias})`);
             });
 
             for (const [acao, listaJMS] of Object.entries(pacotesPorAcao)) {
