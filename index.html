@@ -357,7 +357,7 @@
         .badge-loss { background-color: var(--primary-dark); color: white; border: 1px solid #fff; }
         .badge-purple { background-color: var(--purple-alert); color: white; }
         .badge-error { background-color: #b91c1c; color: white; } 
-        .badge-marcos { background-color: #9333ea; color: white; border: 1px solid #7e22ce;} /* Novo Badge Marcos */
+        .badge-marcos { background-color: #9333ea; color: white; border: 1px solid #7e22ce;}
 
         .hidden { display: none !important; }
         
@@ -381,7 +381,6 @@
         .btn-excel { background-color: var(--success-green); }
         .btn-excel:hover { background-color: #059669; }
 
-        /* Estilo Botão WhatsApp */
         .btn-whatsapp { background-color: #25D366; }
         .btn-whatsapp:hover { background-color: #1DA851; }
         
@@ -437,7 +436,7 @@
             flex-grow: 1;
         }
 
-        .modal-body select {
+        .modal-body select, .modal-body input[type="number"] {
             width: 100%; padding: 12px; margin-bottom: 15px;
             border: 1px solid var(--border-color); border-radius: 4px;
             font-size: 1rem; color: var(--text-main); font-family: inherit;
@@ -567,7 +566,7 @@
                     <label>Dias Parado (Mín)</label>
                     <input type="number" id="filterDias" min="0" placeholder="Ex: 2">
                 </div>
-                <div class="filter-group" style="display:none;"> <!-- Ocultado para espaço, uso opcional -->
+                <div class="filter-group" style="display:none;">
                     <label>Tratativa Incorreta</label>
                     <select id="filterErrosBaixa">
                         <option value="">Todas</option>
@@ -631,10 +630,30 @@
             <button class="btn-close" onclick="fecharModalCobranca()"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body">
-            <label for="selectCidadeCobranca" style="font-weight: 600; font-size: 0.9rem; margin-bottom: 5px; display: block;">Selecione a Opção de Cobrança:</label>
-            <select id="selectCidadeCobranca" onchange="gerarTextoCobranca()">
-                </select>
-            <textarea id="textoCobranca" readonly placeholder="Os recados aparecerão aqui após a seleção..."></textarea>
+            <div style="display: flex; gap: 15px; margin-bottom: 5px;">
+                <div style="flex: 1;">
+                    <label for="diasCobranca" style="font-weight: 600; font-size: 0.9rem; margin-bottom: 5px; display: block;">Mín. Dias Parados:</label>
+                    <input type="number" id="diasCobranca" value="2" min="1" onchange="abrirModalCobranca()" style="margin-bottom: 0;">
+                </div>
+                <div style="flex: 2;">
+                    <label for="selectCidadeCobranca" style="font-weight: 600; font-size: 0.9rem; margin-bottom: 5px; display: block;">Selecione a Opção de Cobrança:</label>
+                    <!-- Trocado o evento para disparar as mudanças dinâmicas -->
+                    <select id="selectCidadeCobranca" onchange="mudouOpcaoCobranca()" style="margin-bottom: 0;">
+                    </select>
+                </div>
+            </div>
+            
+            <!-- NOVO: Filtro Dinâmico de Motoristas Fictícios -->
+            <div id="containerFiltroMotoristas" class="hidden" style="margin-top: 15px; margin-bottom: 15px;">
+                <label style="font-weight: 600; font-size: 0.9rem; margin-bottom: 5px; display: block; color: var(--accent-blue);">
+                    <i class="fa-solid fa-users-slash"></i> Filtrar Motoristas (Desmarque os Fictícios):
+                </label>
+                <div id="listaMotoristasOcultar" style="max-height: 110px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; background: #f8fafc; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px;">
+                    <!-- Caixinhas de seleção (checkboxes) aparecerão automaticamente aqui -->
+                </div>
+            </div>
+
+            <textarea id="textoCobranca" readonly placeholder="Os recados aparecerão aqui após a seleção..." style="margin-top: 15px;"></textarea>
         </div>
         <div class="modal-footer">
             <button class="btn-action" style="background-color: var(--text-muted);" onclick="fecharModalCobranca()">Fechar</button>
@@ -654,7 +673,6 @@
 
     document.getElementById('fileUpload').addEventListener('change', handleFileUpload);
     
-    // Adicionado o 'filterPrestacaoConta' na lista
     const filterInputs = ['filterJMS', 'filterDateStart', 'filterTipo', 'filterDias', 'filterResponsavel', 'toggleEntregues', 'filterSaidas', 'filterEntradas', 'filterErrosBaixa', 'filterFicticio', 'filterPrestacaoConta'];
     filterInputs.forEach(id => {
         const el = document.getElementById(id);
@@ -713,7 +731,6 @@
             let base = linha["Base de escaneamento"];
             const jms = linha["Número de pedido JMS"];
             
-            // FILTRO DE BASE F RVD
             if (!base || !jms || !base.toString().includes("F RVD")) return;
 
             let dataBipagem = linha["Tempo de digitalização"];
@@ -746,18 +763,16 @@
             let motoristaSalvoNaMemoria = "";
             let flagPerdido = false;
             
-            // Contadores e Lógicas
             let countSaidas = 0;
             let countEntradasNaoExpedido = 0; 
             let countAusencia = 0;
             let isNaBase = true;
             let primeiraSaidaData = null; 
             
-            // Lógicas Prestação de Contas & Tratativa Incorreta
             let estadoTratativa = "base"; 
             let isTratativaIncorreta = false;
             
-            let datasAusencia = new Set(); // Guarda os dias (YYY-MM-DD) das ausências
+            let datasAusencia = new Set(); 
             let isFalhaPrestacaoConta = false;
             let motivoFalhaPrestacao = "";
             let ultimoProblemaConhecido = "";
@@ -766,7 +781,6 @@
                 const tipoLower = registro.tipo.toLowerCase();
                 const tipoProbLower = (registro.tipoProblematico || "").toLowerCase();
 
-                // Rastreador de Ausências (Dias distintos)
                 if (tipoProbLower.includes("ausência") || tipoProbLower.includes("ausencia") || tipoProbLower.includes("客户不在")) {
                     countAusencia++;
                     const dataLocal = new Date(registro.data.getTime() - (registro.data.getTimezoneOffset() * 60000));
@@ -777,14 +791,12 @@
                     countEntradasNaoExpedido++;
                 }
 
-                // MÁQUINA DE ESTADOS - Movimentações
                 if (tipoLower.includes("saída para entrega") || tipoLower.includes("saida para entrega")) {
                     estadoTratativa = "na_rua";
                     motoristaSalvoNaMemoria = registro.motorista || motoristaSalvoNaMemoria;
                     
                     if (!primeiraSaidaData) primeiraSaidaData = registro.data; 
                     
-                    // Reseta falha caso pacote volte para a rua
                     isFalhaPrestacaoConta = false; 
                     motivoFalhaPrestacao = "";
 
@@ -800,7 +812,7 @@
                 } 
                 else if (tipoLower.includes("problemático") || tipoLower.includes("problematico") || registro.tipoProblematico) {
                     estadoTratativa = "problema"; 
-                    ultimoProblemaConhecido = tipoProbLower; // Salva para checar na devolução
+                    ultimoProblemaConhecido = tipoProbLower; 
                     
                     if (!motoristaSalvoNaMemoria || motoristaSalvoNaMemoria.trim() === "") {
                         responsavelAtual = registro.base;
@@ -813,7 +825,6 @@
                 } 
                 else if (tipoLower.includes("entrada no galpão") || tipoLower.includes("entrada no galpao")) {
                     
-                    // VERIFICAÇÃO DE FALHA NA PRESTAÇÃO DE CONTAS
                     if (estadoTratativa === "na_rua") {
                         isTratativaIncorreta = true;
                         isFalhaPrestacaoConta = true;
@@ -871,8 +882,8 @@
                 countAusencia: countAusencia,
                 diasAusentesUnicos: datasAusencia.size,
                 municipioDestino: ultimoRegistro.municipio,
-                responsavel: responsavelAtual, // O atual, que se tornou Base
-                responsavelAnterior: motoristaSalvoNaMemoria, // Para sabermos qual motorista devolver indevidamente
+                responsavel: responsavelAtual, 
+                responsavelAnterior: motoristaSalvoNaMemoria, 
                 diasParado: diasParado >= 0 ? diasParado : 0,
                 qtdSaidas: countSaidas, 
                 qtdEntradasNaoExpedido: countEntradasNaoExpedido, 
@@ -926,7 +937,6 @@
             if (strErroBaixa === 'erro' && !item.isTratativaIncorreta) return false;
             if (strFicticio === 'preso' && !item.isPresoEmRota) return false;
             
-            // FILTRO NOVO: PRESTAÇÃO DE CONTAS
             if (strPrestacao === 'falha' && !item.isFalhaPrestacaoConta) return false;
 
             const offset = item.ultimaData.getTimezoneOffset() * 60000;
@@ -1031,12 +1041,10 @@
                 badges += `<span class="badge badge-error"><i class="fa-solid fa-ban"></i> RETORNO S/ BAIXA</span>`;
             }
 
-            // ALERTA VISUAL: PRESTAÇÃO DE CONTAS MARCOS
             if (item.isFalhaPrestacaoConta && !item.isEntregue) {
                 badges += `<span class="badge badge-marcos" title="${item.motivoFalhaPrestacao}"><i class="fa-solid fa-clipboard-user"></i> FALHA P. CONTAS (MARCOS)</span>`;
             }
             
-            // ALERTA VISUAL: Bipagem Fictícia (Burlando SLA)
             if (item.isPresoEmRota) {
                 badges += `<span class="badge" style="background-color: #000; color: #fff; border: 1px solid #dc2626;"><i class="fa-solid fa-stopwatch"></i> ROTA ${item.diasDesdePrimeiraSaida} DIAS</span>`;
                 infoDias = `<b style="font-size: 1.1em; color: #dc2626;">Fictício (${item.diasDesdePrimeiraSaida}d)</b>`;
@@ -1123,7 +1131,7 @@
     }
 
     /* =========================================
-       NOVAS FUNÇÕES - COBRANÇA WHATSAPP
+       FUNÇÕES - COBRANÇA WHATSAPP (ATUALIZADAS COM FILTRO)
        ========================================= */
 
     function abrirModalCobranca() {
@@ -1133,48 +1141,77 @@
         }
 
         const select = document.getElementById('selectCidadeCobranca');
+        const minDias = parseInt(document.getElementById('diasCobranca').value) || 2;
+        
+        const selecaoAtual = select.value;
+
         select.innerHTML = '<option value="">Selecione uma opção...</option>';
         document.getElementById('textoCobranca').value = "";
+        document.getElementById('containerFiltroMotoristas').classList.add('hidden');
 
         const cidadesComAtraso = new Set();
+        const cidadesImpedidos = new Set();
         let temBase = false;
         let temFalhaPrestacao = false;
 
         dadosProcessados.forEach(item => {
-            if (!item.isEntregue && (item.diasParado >= 2 || item.isPresoEmRota)) {
+            if (!item.isEntregue && (item.diasParado >= minDias || item.isPresoEmRota)) {
                 if (item.isNaBase && !item.isPresoEmRota && !item.isFalhaPrestacaoConta) {
                     temBase = true; 
                 } else if (!item.isNaBase) {
                     cidadesComAtraso.add(item.municipioDestino); 
                 }
             }
-            // Verifica se existe alguma falha de prestação de contas pendente no galpão
             if (!item.isEntregue && item.isFalhaPrestacaoConta && item.isNaBase) {
                 temFalhaPrestacao = true;
             }
+            if (item.isPresoEmRota) {
+                cidadesImpedidos.add(item.municipioDestino);
+            }
         });
 
-        // ADICIONA MARCOS VINICIUS
+        // IMPEDIDOS DE CARREGAR SEPARADOS POR CIDADE
+        if (cidadesImpedidos.size > 0) {
+            const optGroupImpedidos = document.createElement('optgroup');
+            optGroupImpedidos.label = "🚫 Impedidos de Carregar (4+ Dias em Rota)";
+            optGroupImpedidos.appendChild(new Option("🚫 TODAS AS CIDADES (Impedidos)", "__IMPEDIDOS_TODOS__"));
+            Array.from(cidadesImpedidos).sort().forEach(cidade => {
+                optGroupImpedidos.appendChild(new Option(`🚫 IMPEDIDOS - ${cidade}`, `__IMPEDIDOS__${cidade}`));
+            });
+            select.appendChild(optGroupImpedidos);
+        }
+
         if (temFalhaPrestacao) {
             select.add(new Option("📋 COBRAR PRESTAÇÃO DE CONTAS (Marcos Vinícius)", "__MARCOS__"));
         }
 
         if (temBase) {
-            select.add(new Option("🏢 COBRAR PARADOS NA BASE (Ciribaldo)", "__BASE__"));
+            select.add(new Option(`🏢 COBRAR PARADOS NA BASE (Ciribaldo) - ${minDias}+ Dias`, "__BASE__"));
         }
 
         if (cidadesComAtraso.size > 0) {
             const optGroup = document.createElement('optgroup');
-            optGroup.label = "Cobrar Motoristas por Cidade";
+            optGroup.label = `Cobrar Motoristas por Cidade (${minDias}+ Dias)`;
             
             Array.from(cidadesComAtraso).sort().forEach(cidade => {
                 const opt = new Option(`📍 ${cidade}`, cidade);
                 optGroup.appendChild(opt);
             });
             select.appendChild(optGroup);
-        } else if (!temBase && !temFalhaPrestacao) {
-            alert("Nenhuma pendência crítica encontrada nos dados atuais.");
+        } else if (!temBase && !temFalhaPrestacao && cidadesImpedidos.size === 0) {
+            document.getElementById('cobrancaModal').classList.remove('hidden');
+            document.getElementById('textoCobranca').value = "✅ Nenhuma pendência encontrada para o filtro de dias selecionado.";
             return;
+        }
+
+        if (selecaoAtual) {
+            for (let i = 0; i < select.options.length; i++) {
+                if (select.options[i].value === selecaoAtual) {
+                    select.selectedIndex = i;
+                    mudouOpcaoCobranca(); 
+                    break;
+                }
+            }
         }
 
         document.getElementById('cobrancaModal').classList.remove('hidden');
@@ -1216,42 +1253,161 @@
         return "⚠️ Pacote sem baixa final. Favor verificar no app.";
     }
 
+    // Função Nova: Analisa a opção e constrói a lista de motoristas para filtro
+    function mudouOpcaoCobranca() {
+        const selecao = document.getElementById('selectCidadeCobranca').value;
+        const minDias = parseInt(document.getElementById('diasCobranca').value) || 2;
+        let pacotesBrutos = [];
+
+        if (selecao.startsWith("__IMPEDIDOS")) {
+            let cidadeFiltro = selecao === "__IMPEDIDOS_TODOS__" ? null : selecao.replace("__IMPEDIDOS__", "");
+            pacotesBrutos = dadosProcessados.filter(item => {
+                if (!item.isPresoEmRota) return false;
+                if (cidadeFiltro && item.municipioDestino !== cidadeFiltro) return false;
+                return true;
+            });
+        } else if (selecao === "__MARCOS__") {
+            pacotesBrutos = dadosProcessados.filter(item => !item.isEntregue && item.isFalhaPrestacaoConta && item.isNaBase);
+        } else if (selecao === "__BASE__") {
+            // Galpão não precisa de filtro de motorista fictício, então deixamos o array vazio.
+            pacotesBrutos = []; 
+        } else if (selecao) { 
+            pacotesBrutos = dadosProcessados.filter(item => 
+                item.municipioDestino === selecao && 
+                !item.isEntregue && 
+                (item.diasParado >= minDias || item.isPresoEmRota) &&
+                !item.isNaBase 
+            );
+        }
+
+        const container = document.getElementById('listaMotoristasOcultar');
+        const boxContainer = document.getElementById('containerFiltroMotoristas');
+        container.innerHTML = '';
+        
+        if (pacotesBrutos.length > 0 && selecao !== "__BASE__") {
+            const motoristas = [...new Set(pacotesBrutos.map(p => selecao === "__MARCOS__" ? (p.responsavelAnterior || "Desconhecido") : p.responsavel))].sort();
+            
+            motoristas.forEach(mot => {
+                const label = document.createElement('label');
+                label.style.display = 'flex';
+                label.style.alignItems = 'center';
+                label.style.gap = '5px';
+                label.style.fontSize = '0.85rem';
+                label.style.cursor = 'pointer';
+                label.style.color = 'var(--text-main)';
+                label.style.whiteSpace = 'nowrap';
+                label.style.overflow = 'hidden';
+                label.style.textOverflow = 'ellipsis';
+                label.title = mot;
+                
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = mot;
+                cb.checked = true;
+                cb.className = 'cb-motorista';
+                cb.onchange = gerarTextoCobranca; // Aciona o filtro assim que marcar/desmarcar
+                
+                label.appendChild(cb);
+                label.appendChild(document.createTextNode(mot));
+                container.appendChild(label);
+            });
+            boxContainer.classList.remove('hidden');
+        } else {
+            boxContainer.classList.add('hidden');
+        }
+
+        gerarTextoCobranca(); // Gera o texto logo após criar a lista
+    }
+
     function gerarTextoCobranca() {
         const selecao = document.getElementById('selectCidadeCobranca').value;
         const textarea = document.getElementById('textoCobranca');
+        const minDias = parseInt(document.getElementById('diasCobranca').value) || 2;
 
         if (!selecao) {
             textarea.value = "";
             return;
         }
 
-        // LÓGICA MARCOS VINICIUS
-        if (selecao === "__MARCOS__") {
-            const pacotesMarcos = dadosProcessados.filter(item => 
-                !item.isEntregue && item.isFalhaPrestacaoConta && item.isNaBase
-            );
+        // Lê os motoristas que continuam marcados na tela
+        const checkboxes = document.querySelectorAll('.cb-motorista');
+        const motoristasAtivos = new Set();
+        checkboxes.forEach(cb => {
+            if (cb.checked) motoristasAtivos.add(cb.value);
+        });
 
-            let texto = `🚨 *ATENÇÃO MARCOS VINÍCIUS - FALHA NA PRESTAÇÃO DE CONTAS* 🚨\n\n`;
-            texto += `Marcos, favor verificar e cobrar os motoristas sobre os pacotes abaixo. Eles foram devolvidos ao galpão INDEVIDAMENTE (sem lançar problema ou sem bater as 3 ausências):\n\n`;
+        // Retorna "true" se o painel estiver escondido ou se o motorista estiver na lista de marcados
+        function motoristaLiberado(nome) {
+            if (document.getElementById('containerFiltroMotoristas').classList.contains('hidden')) return true;
+            return motoristasAtivos.has(nome);
+        }
 
-            pacotesMarcos.forEach(pacote => {
-                texto += `📦 *Pedido:* ${pacote.jms}\n`;
-                texto += `👤 *Motorista:* ${pacote.responsavelAnterior || "Desconhecido"}\n`;
-                texto += `🛑 *Motivo:* ${pacote.motivoFalhaPrestacao}\n`;
-                texto += `-------------------------------------------\n`;
+        if (selecao.startsWith("__IMPEDIDOS")) {
+            let cidadeFiltro = selecao === "__IMPEDIDOS_TODOS__" ? null : selecao.replace("__IMPEDIDOS__", "");
+            
+            const pacotesImpedidos = dadosProcessados.filter(item => {
+                if (!item.isPresoEmRota) return false;
+                if (cidadeFiltro && item.municipioDestino !== cidadeFiltro) return false;
+                if (!motoristaLiberado(item.responsavel)) return false; // Filtra aqui!
+                return true;
             });
+            
+            const agrupadoPorMotorista = {};
+            pacotesImpedidos.forEach(item => {
+                if (!agrupadoPorMotorista[item.responsavel]) agrupadoPorMotorista[item.responsavel] = [];
+                agrupadoPorMotorista[item.responsavel].push(item);
+            });
+
+            let texto = `🚫 *ATENÇÃO - MOTORISTAS IMPEDIDOS DE CARREGAR* 🚫\n`;
+            if (cidadeFiltro) texto += `📍 Cidade: *${cidadeFiltro}*\n`;
+            texto += `\nOs motoristas abaixo estão com pacotes há mais de 4 dias em rota. Conforme as regras, vocês *SÓ PODEM CARREGAR NOVOS PACOTES QUANDO FINALIZAREM AS SEGUINTES PENDÊNCIAS*:\n\n`;
+
+            if (Object.keys(agrupadoPorMotorista).length === 0) {
+                texto += `✅ Nenhum motorista impedido encontrado (com base nos filtros selecionados).\n`;
+            } else {
+                for (const [motorista, pacotes] of Object.entries(agrupadoPorMotorista)) {
+                    texto += `👤 *Motorista:* ${motorista}\n`;
+                    texto += `📦 *Pacotes Retidos:*\n`;
+                    pacotes.forEach(pacote => {
+                        texto += ` - ${pacote.jms} (${pacote.diasDesdePrimeiraSaida} dias em rota)\n`;
+                    });
+                    texto += `-------------------------------------------\n`;
+                }
+            }
 
             textarea.value = texto;
             return;
         }
 
-        // LÓGICA BASE (CIRIBALDO)
-        if (selecao === "__BASE__") {
-            const pacotesBase = dadosProcessados.filter(item => 
-                !item.isEntregue && item.diasParado >= 2 && item.isNaBase && !item.isPresoEmRota && !item.isFalhaPrestacaoConta
+        if (selecao === "__MARCOS__") {
+            const pacotesMarcos = dadosProcessados.filter(item => 
+                !item.isEntregue && item.isFalhaPrestacaoConta && item.isNaBase && motoristaLiberado(item.responsavelAnterior || "Desconhecido")
             );
 
-            let texto = `🚨 *ATENÇÃO CIRIBALDO - PENDÊNCIAS NA BASE (2+ DIAS)* 🚨\n\n`;
+            let texto = `🚨 *ATENÇÃO MARCOS VINÍCIUS - FALHA NA PRESTAÇÃO DE CONTAS* 🚨\n\n`;
+            texto += `Marcos, favor verificar e cobrar os motoristas sobre os pacotes abaixo. Eles foram devolvidos ao galpão INDEVIDAMENTE (sem lançar problema ou sem bater as 3 ausências):\n\n`;
+
+            if (pacotesMarcos.length === 0) {
+                texto += `✅ Nenhuma pendência após aplicar os filtros.`;
+            } else {
+                pacotesMarcos.forEach(pacote => {
+                    texto += `📦 *Pedido:* ${pacote.jms}\n`;
+                    texto += `👤 *Motorista:* ${pacote.responsavelAnterior || "Desconhecido"}\n`;
+                    texto += `🛑 *Motivo:* ${pacote.motivoFalhaPrestacao}\n`;
+                    texto += `-------------------------------------------\n`;
+                });
+            }
+
+            textarea.value = texto;
+            return;
+        }
+
+        if (selecao === "__BASE__") {
+            const pacotesBase = dadosProcessados.filter(item => 
+                !item.isEntregue && item.diasParado >= minDias && item.isNaBase && !item.isPresoEmRota && !item.isFalhaPrestacaoConta
+            );
+
+            let texto = `🚨 *ATENÇÃO CIRIBALDO - PENDÊNCIAS NA BASE (${minDias}+ DIAS)* 🚨\n\n`;
             texto += `Líder, favor verificar os seguintes pacotes que constam retidos no galpão sem motorista atrelado:\n\n`;
 
             const agrupadoPorCidade = {};
@@ -1273,13 +1429,13 @@
             return;
         }
 
-        // LÓGICA CIDADES MOTORISTAS
         const cidade = selecao;
         const pacotesCobranca = dadosProcessados.filter(item => 
             item.municipioDestino === cidade && 
             !item.isEntregue && 
-            (item.diasParado >= 2 || item.isPresoEmRota) &&
-            !item.isNaBase 
+            (item.diasParado >= minDias || item.isPresoEmRota) &&
+            !item.isNaBase &&
+            motoristaLiberado(item.responsavel) // Filtra motoristas desmarcados
         );
 
         const agrupadoPorMotorista = {};
@@ -1292,30 +1448,30 @@
 
         let texto = `🚨 *ATENÇÃO MOTORISTAS - PENDÊNCIAS CRÍTICAS* 🚨\n📍 Cidade: *${cidade}*\n\n`;
 
-        for (const [motorista, pacotes] of Object.entries(agrupadoPorMotorista)) {
-            texto += `👤 MOTORISTA: *${motorista}* - ${pacotes.length} PACOTES CRÍTICOS\n\n`;
-            
-            const pacotesPorAcao = {};
-            pacotes.forEach(pacote => {
-                const acao = definirAcaoExigida(pacote);
-                if (!pacotesPorAcao[acao]) {
-                    pacotesPorAcao[acao] = [];
-                }
-                const textoDias = pacote.isPresoEmRota ? `${pacote.diasDesdePrimeiraSaida} dias em rota` : `${pacote.diasParado} dias parado`;
-                pacotesPorAcao[acao].push(`${pacote.jms} (${textoDias})`);
-            });
-
-            for (const [acao, listaJMS] of Object.entries(pacotesPorAcao)) {
-                texto += `🛑 AÇÃO: ${acao}\n\n`;
-                texto += `Pedidos :\n`;
-                texto += `${listaJMS.join('\n')}\n\n`;
-            }
-            
-            texto += `--------------------------------------------------\n\n`;
-        }
-
         if (Object.keys(agrupadoPorMotorista).length === 0) {
-            texto = `✅ Nenhuma pendência crítica para motoristas encontrada em ${cidade}.`;
+            texto = `✅ Nenhuma pendência crítica para motoristas encontrada em ${cidade} após aplicar os filtros.`;
+        } else {
+            for (const [motorista, pacotes] of Object.entries(agrupadoPorMotorista)) {
+                texto += `👤 MOTORISTA: *${motorista}* - ${pacotes.length} PACOTES CRÍTICOS\n\n`;
+                
+                const pacotesPorAcao = {};
+                pacotes.forEach(pacote => {
+                    const acao = definirAcaoExigida(pacote);
+                    if (!pacotesPorAcao[acao]) {
+                        pacotesPorAcao[acao] = [];
+                    }
+                    const textoDias = pacote.isPresoEmRota ? `${pacote.diasDesdePrimeiraSaida} dias em rota` : `${pacote.diasParado} dias parado`;
+                    pacotesPorAcao[acao].push(`${pacote.jms} (${textoDias})`);
+                });
+
+                for (const [acao, listaJMS] of Object.entries(pacotesPorAcao)) {
+                    texto += `🛑 AÇÃO: ${acao}\n\n`;
+                    texto += `Pedidos :\n`;
+                    texto += `${listaJMS.join('\n')}\n\n`;
+                }
+                
+                texto += `--------------------------------------------------\n\n`;
+            }
         }
 
         textarea.value = texto;
