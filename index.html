@@ -637,19 +637,16 @@
                 </div>
                 <div style="flex: 2;">
                     <label for="selectCidadeCobranca" style="font-weight: 600; font-size: 0.9rem; margin-bottom: 5px; display: block;">Selecione a Opção de Cobrança:</label>
-                    <!-- Trocado o evento para disparar as mudanças dinâmicas -->
                     <select id="selectCidadeCobranca" onchange="mudouOpcaoCobranca()" style="margin-bottom: 0;">
                     </select>
                 </div>
             </div>
             
-            <!-- NOVO: Filtro Dinâmico de Motoristas Fictícios -->
             <div id="containerFiltroMotoristas" class="hidden" style="margin-top: 15px; margin-bottom: 15px;">
                 <label style="font-weight: 600; font-size: 0.9rem; margin-bottom: 5px; display: block; color: var(--accent-blue);">
                     <i class="fa-solid fa-users-slash"></i> Filtrar Motoristas (Desmarque os Fictícios):
                 </label>
                 <div id="listaMotoristasOcultar" style="max-height: 110px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; background: #f8fafc; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px;">
-                    <!-- Caixinhas de seleção (checkboxes) aparecerão automaticamente aqui -->
                 </div>
             </div>
 
@@ -761,6 +758,7 @@
 
             let responsavelAtual = "Base";
             let motoristaSalvoNaMemoria = "";
+            let ultimoMotoristaConhecido = ""; 
             let flagPerdido = false;
             
             let countSaidas = 0;
@@ -768,6 +766,10 @@
             let countAusencia = 0;
             let isNaBase = true;
             let primeiraSaidaData = null; 
+            
+            let motoristasDeSaida = new Set();
+            let primeiraSaidaDataAtualMotorista = null;
+            let ultimoMotoristaQueSaiu = "";
             
             let estadoTratativa = "base"; 
             let isTratativaIncorreta = false;
@@ -794,8 +796,19 @@
                 if (tipoLower.includes("saída para entrega") || tipoLower.includes("saida para entrega")) {
                     estadoTratativa = "na_rua";
                     motoristaSalvoNaMemoria = registro.motorista || motoristaSalvoNaMemoria;
+                    if (motoristaSalvoNaMemoria) ultimoMotoristaConhecido = motoristaSalvoNaMemoria;
                     
                     if (!primeiraSaidaData) primeiraSaidaData = registro.data; 
+                    
+                    if (motoristaSalvoNaMemoria) {
+                        motoristasDeSaida.add(motoristaSalvoNaMemoria);
+                        
+                        // Nova lógica de rastreio contínuo
+                        if (motoristaSalvoNaMemoria !== ultimoMotoristaQueSaiu) {
+                            ultimoMotoristaQueSaiu = motoristaSalvoNaMemoria;
+                            primeiraSaidaDataAtualMotorista = registro.data;
+                        }
+                    }
                     
                     isFalhaPrestacaoConta = false; 
                     motivoFalhaPrestacao = "";
@@ -813,6 +826,7 @@
                 else if (tipoLower.includes("problemático") || tipoLower.includes("problematico") || registro.tipoProblematico) {
                     estadoTratativa = "problema"; 
                     ultimoProblemaConhecido = tipoProbLower; 
+                    if (registro.motorista) ultimoMotoristaConhecido = registro.motorista;
                     
                     if (!motoristaSalvoNaMemoria || motoristaSalvoNaMemoria.trim() === "") {
                         responsavelAtual = registro.base;
@@ -842,6 +856,7 @@
                     estadoTratativa = "base";
                     responsavelAtual = registro.base;
                     motoristaSalvoNaMemoria = ""; 
+                    ultimoMotoristaQueSaiu = ""; // Reseta a posse para recomeçar
                     ultimoProblemaConhecido = ""; 
                     isNaBase = true;
                     flagPerdido = false;
@@ -868,8 +883,17 @@
                 const dataPrimeiraSaidaLimpa = new Date(primeiraSaidaData.getFullYear(), primeiraSaidaData.getMonth(), primeiraSaidaData.getDate());
                 diasDesdePrimeiraSaida = Math.floor((HOJE.getTime() - dataPrimeiraSaidaLimpa.getTime()) / (1000 * 3600 * 24));
             }
+
+            let diasComMotoristaAtual = 0;
+            if (primeiraSaidaDataAtualMotorista) {
+                const dataAtualLimpa = new Date(primeiraSaidaDataAtualMotorista.getFullYear(), primeiraSaidaDataAtualMotorista.getMonth(), primeiraSaidaDataAtualMotorista.getDate());
+                diasComMotoristaAtual = Math.floor((HOJE.getTime() - dataAtualLimpa.getTime()) / (1000 * 3600 * 24));
+            }
             
-            const isPresoEmRota = (diasDesdePrimeiraSaida >= 4 && !isEntregue && !isNaBase);
+            const teveOutroMotorista = motoristasDeSaida.size > 1;
+            
+            // ATUALIZADO: Motorista só é penalizado se ELE estiver com o pacote há 4 dias
+            const isPresoEmRota = (diasComMotoristaAtual >= 4 && !isEntregue && !isNaBase);
 
             tiposBipagemSet.add(ultimoRegistro.tipo);
             responsaveisSet.add(responsavelAtual);
@@ -883,7 +907,7 @@
                 diasAusentesUnicos: datasAusencia.size,
                 municipioDestino: ultimoRegistro.municipio,
                 responsavel: responsavelAtual, 
-                responsavelAnterior: motoristaSalvoNaMemoria, 
+                responsavelAnterior: ultimoMotoristaConhecido, 
                 diasParado: diasParado >= 0 ? diasParado : 0,
                 qtdSaidas: countSaidas, 
                 qtdEntradasNaoExpedido: countEntradasNaoExpedido, 
@@ -892,6 +916,8 @@
                 isNaBase: isNaBase,
                 isTratativaIncorreta: isTratativaIncorreta,
                 diasDesdePrimeiraSaida: diasDesdePrimeiraSaida, 
+                diasComMotoristaAtual: diasComMotoristaAtual,
+                teveOutroMotorista: teveOutroMotorista,
                 isPresoEmRota: isPresoEmRota, 
                 isFalhaPrestacaoConta: isFalhaPrestacaoConta,
                 motivoFalhaPrestacao: motivoFalhaPrestacao
@@ -1045,9 +1071,10 @@
                 badges += `<span class="badge badge-marcos" title="${item.motivoFalhaPrestacao}"><i class="fa-solid fa-clipboard-user"></i> FALHA P. CONTAS (MARCOS)</span>`;
             }
             
+            // ALERTA VISUAL: Baseado APENAS nos dias do motorista ATUAL
             if (item.isPresoEmRota) {
-                badges += `<span class="badge" style="background-color: #000; color: #fff; border: 1px solid #dc2626;"><i class="fa-solid fa-stopwatch"></i> ROTA ${item.diasDesdePrimeiraSaida} DIAS</span>`;
-                infoDias = `<b style="font-size: 1.1em; color: #dc2626;">Fictício (${item.diasDesdePrimeiraSaida}d)</b>`;
+                badges += `<span class="badge" style="background-color: #000; color: #fff; border: 1px solid #dc2626;"><i class="fa-solid fa-stopwatch"></i> ROTA ${item.diasComMotoristaAtual} DIAS</span>`;
+                infoDias = `<b style="font-size: 1.1em; color: #dc2626;">Fictício (${item.diasComMotoristaAtual}d)</b>`;
             }
 
             if (item.isEntregue) {
@@ -1100,9 +1127,11 @@
                 "Pedido JMS": item.jms,
                 "Responsável": item.responsavel,
                 "Última Movimentação": item.ultimaData.toLocaleString('pt-BR'),
-                "Dias Parado": item.isEntregue ? "Entregue" : item.diasParado,
-                "Dias Real na Rua": item.diasDesdePrimeiraSaida, 
-                "Bipagem Fictícia": item.isPresoEmRota ? "Sim (Burlando SLA)" : "Não",
+                "Dias Parado (Última Mov)": item.isEntregue ? "Entregue" : item.diasParado,
+                "Dias Total em Rota": item.diasDesdePrimeiraSaida, 
+                "Dias com Motorista Atual": item.diasComMotoristaAtual,
+                "Saiu com Outro Antes?": item.teveOutroMotorista ? "Sim" : "Não",
+                "Bipagem Fictícia (Impedido)": item.isPresoEmRota ? "Sim (Burlando SLA)" : "Não",
                 "Falha Prestação Contas": item.isFalhaPrestacaoConta ? "Sim" : "Não",
                 "Motivo Falha (Marcos)": item.motivoFalhaPrestacao,
                 "Tentativas de Entrega": item.qtdSaidas,
@@ -1131,7 +1160,7 @@
     }
 
     /* =========================================
-       FUNÇÕES - COBRANÇA WHATSAPP (ATUALIZADAS COM FILTRO)
+       FUNÇÕES - COBRANÇA WHATSAPP (LÓGICA PRIORIDADE)
        ========================================= */
 
     function abrirModalCobranca() {
@@ -1170,7 +1199,6 @@
             }
         });
 
-        // IMPEDIDOS DE CARREGAR SEPARADOS POR CIDADE
         if (cidadesImpedidos.size > 0) {
             const optGroupImpedidos = document.createElement('optgroup');
             optGroupImpedidos.label = "🚫 Impedidos de Carregar (4+ Dias em Rota)";
@@ -1221,21 +1249,31 @@
         document.getElementById('cobrancaModal').classList.add('hidden');
     }
 
+    // NOVA LÓGICA DE TEXTO PARA PRIORIDADES
     function definirAcaoExigida(item) {
         if (item.isPresoEmRota) {
-            return `🚫 ALERTA GRAVE - RETENÇÃO: Este pacote está com você há ${item.diasDesdePrimeiraSaida} dias. O sistema acusa bipagem repetida de saída sem finalização real. DEVOLVA IMEDIATAMENTE NO GALPÃO OU FINALIZE.`;
+            if (item.teveOutroMotorista) {
+                return `🚫 ALERTA GRAVE - RETENÇÃO E PRIORIDADE: Já passou por outro motorista e agora está RETIDO COM VOCÊ há ${item.diasComMotoristaAtual} dias (Total em rota: ${item.diasDesdePrimeiraSaida}d). DEVOLVA IMEDIATAMENTE NO GALPÃO OU FINALIZE.`;
+            }
+            return `🚫 ALERTA GRAVE - RETENÇÃO: Este pacote está com você há ${item.diasComMotoristaAtual} dias. O sistema acusa bipagem repetida de saída sem finalização real. DEVOLVA IMEDIATAMENTE NO GALPÃO OU FINALIZE.`;
         }
         
         const bipagemStr = item.tipoBipagem.toLowerCase();
         const probStr = (item.ultimoTipoProblematico || "").toLowerCase();
 
         if (bipagemStr.includes("saída para entrega") || bipagemStr.includes("saida para entrega")) {
+            if (item.teveOutroMotorista) {
+                 return `🚨 PACOTE PRIORIDADE: Já saiu com outro motorista antes. Está com você há ${item.diasComMotoristaAtual} dias (Total em rota: ${item.diasDesdePrimeiraSaida}d). Por favor, priorize essa entrega!`;
+            }
             return "❌ Faltando finalização. Pacote em aberto! Por favor, finalizar a entrega ou lançar a baixa problemática no aplicativo urgentemente.";
         }
 
         if (bipagemStr.includes("problemático") || bipagemStr.includes("problematico") || probStr !== "") {
             
             if (probStr.includes("endereço") || probStr.includes("endereco") || probStr.includes("recusa") || probStr.includes("impossibilidade") || probStr.includes("地址信息错误") || probStr.includes("无理由拒收") || probStr.includes("客户地址无法进入")) {
+                if (item.teveOutroMotorista) {
+                     return `🔄 DEVOLVER NO GALPÃO (Prioridade). (Motivo: Endereço Incorreto / Recusa. Total em rota: ${item.diasDesdePrimeiraSaida}d).`;
+                }
                 return "🔄 DEVOLVER NO GALPÃO. (Motivo: Endereço Incorreto / Recusa / Impossibilidade de Chegar).";
             }
             
@@ -1243,6 +1281,9 @@
                 if (item.countAusencia >= 3) {
                     return `🔄 DEVOLVER NO GALPÃO. (Motivo: Ausência do cliente. Limite de ${item.countAusencia} tentativas atingido).`;
                 } else {
+                    if (item.teveOutroMotorista) {
+                        return `🚚 REALIZAR NOVA TENTATIVA (PRIORIDADE). Já tem ${item.countAusencia} tentativas. (Total na rota: ${item.diasDesdePrimeiraSaida}d).`;
+                    }
                     return `🚚 REALIZAR NOVA TENTATIVA. (Motivo: Ausência do cliente. Você tem ${item.countAusencia} tentativas registradas. Faça mais uma tentativa).`;
                 }
             }
@@ -1253,7 +1294,6 @@
         return "⚠️ Pacote sem baixa final. Favor verificar no app.";
     }
 
-    // Função Nova: Analisa a opção e constrói a lista de motoristas para filtro
     function mudouOpcaoCobranca() {
         const selecao = document.getElementById('selectCidadeCobranca').value;
         const minDias = parseInt(document.getElementById('diasCobranca').value) || 2;
@@ -1269,7 +1309,6 @@
         } else if (selecao === "__MARCOS__") {
             pacotesBrutos = dadosProcessados.filter(item => !item.isEntregue && item.isFalhaPrestacaoConta && item.isNaBase);
         } else if (selecao === "__BASE__") {
-            // Galpão não precisa de filtro de motorista fictício, então deixamos o array vazio.
             pacotesBrutos = []; 
         } else if (selecao) { 
             pacotesBrutos = dadosProcessados.filter(item => 
@@ -1305,7 +1344,7 @@
                 cb.value = mot;
                 cb.checked = true;
                 cb.className = 'cb-motorista';
-                cb.onchange = gerarTextoCobranca; // Aciona o filtro assim que marcar/desmarcar
+                cb.onchange = gerarTextoCobranca;
                 
                 label.appendChild(cb);
                 label.appendChild(document.createTextNode(mot));
@@ -1316,7 +1355,7 @@
             boxContainer.classList.add('hidden');
         }
 
-        gerarTextoCobranca(); // Gera o texto logo após criar a lista
+        gerarTextoCobranca(); 
     }
 
     function gerarTextoCobranca() {
@@ -1329,14 +1368,12 @@
             return;
         }
 
-        // Lê os motoristas que continuam marcados na tela
         const checkboxes = document.querySelectorAll('.cb-motorista');
         const motoristasAtivos = new Set();
         checkboxes.forEach(cb => {
             if (cb.checked) motoristasAtivos.add(cb.value);
         });
 
-        // Retorna "true" se o painel estiver escondido ou se o motorista estiver na lista de marcados
         function motoristaLiberado(nome) {
             if (document.getElementById('containerFiltroMotoristas').classList.contains('hidden')) return true;
             return motoristasAtivos.has(nome);
@@ -1348,7 +1385,7 @@
             const pacotesImpedidos = dadosProcessados.filter(item => {
                 if (!item.isPresoEmRota) return false;
                 if (cidadeFiltro && item.municipioDestino !== cidadeFiltro) return false;
-                if (!motoristaLiberado(item.responsavel)) return false; // Filtra aqui!
+                if (!motoristaLiberado(item.responsavel)) return false; 
                 return true;
             });
             
@@ -1369,7 +1406,7 @@
                     texto += `👤 *Motorista:* ${motorista}\n`;
                     texto += `📦 *Pacotes Retidos:*\n`;
                     pacotes.forEach(pacote => {
-                        texto += ` - ${pacote.jms} (${pacote.diasDesdePrimeiraSaida} dias em rota)\n`;
+                        texto += ` - ${pacote.jms} (${pacote.diasComMotoristaAtual} dias retidos com vc)\n`;
                     });
                     texto += `-------------------------------------------\n`;
                 }
@@ -1435,7 +1472,7 @@
             !item.isEntregue && 
             (item.diasParado >= minDias || item.isPresoEmRota) &&
             !item.isNaBase &&
-            motoristaLiberado(item.responsavel) // Filtra motoristas desmarcados
+            motoristaLiberado(item.responsavel) 
         );
 
         const agrupadoPorMotorista = {};
@@ -1460,7 +1497,15 @@
                     if (!pacotesPorAcao[acao]) {
                         pacotesPorAcao[acao] = [];
                     }
-                    const textoDias = pacote.isPresoEmRota ? `${pacote.diasDesdePrimeiraSaida} dias em rota` : `${pacote.diasParado} dias parado`;
+                    
+                    // Adiciona os dias no texto base de acordo com o contexto do pacote
+                    let textoDias = "";
+                    if (pacote.teveOutroMotorista && !pacote.isNaBase) {
+                        textoDias = `Total rota: ${pacote.diasDesdePrimeiraSaida}d | Com vc: ${pacote.diasComMotoristaAtual}d`;
+                    } else {
+                        textoDias = pacote.isPresoEmRota ? `${pacote.diasComMotoristaAtual} dias em rota` : `${pacote.diasParado} dias parado`;
+                    }
+                    
                     pacotesPorAcao[acao].push(`${pacote.jms} (${textoDias})`);
                 });
 
